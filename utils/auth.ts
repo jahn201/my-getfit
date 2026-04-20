@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const USERS_KEY = 'registered_users';
+const USERS_KEY = 'my_getfit_users_v1';
 
 export interface StoredUser {
   name: string;
@@ -10,10 +10,19 @@ export interface StoredUser {
 
 /** Retrieve all registered users from storage */
 export async function getUsers(): Promise<StoredUser[]> {
+  console.log(`[Auth] Fetching users from: ${USERS_KEY}`);
   try {
     const json = await AsyncStorage.getItem(USERS_KEY);
-    return json ? JSON.parse(json) : [];
-  } catch {
+    const users = json ? JSON.parse(json) : [];
+    
+    // Ensure the result is an array to prevent crashes if storage is corrupted
+    if (!Array.isArray(users)) {
+      console.error('Auth: Storage is not an array. Resetting.');
+      return [];
+    }
+    return users;
+  } catch (err) {
+    console.error('Auth: Failed to retrieve users:', err);
     return [];
   }
 }
@@ -35,6 +44,7 @@ export async function registerUser(name: string, email: string, password: string
 
   users.push({ name: trimmedName, email: trimmedEmail, password });
   await AsyncStorage.setItem(USERS_KEY, JSON.stringify(users));
+  console.log(`[Auth] User registered successfully: ${trimmedEmail}. Total users: ${users.length}`);
   return null;
 }
 

@@ -62,9 +62,16 @@ export default function RegisterScreen() {
       return;
     }
 
-    Alert.alert('Success 🎉', 'Account created successfully! You can now log in.', [
-      { text: 'Go to Login', onPress: () => router.push('/login') }
-    ]);
+    // On Web, alerts can be blocking or inconsistent. 
+    // We'll show the alert but also provide a fallback redirect.
+    if (Platform.OS === 'web') {
+      alert('Success 🎉 Account created successfully!');
+      router.replace('/login');
+    } else {
+      Alert.alert('Success 🎉', 'Account created successfully! You can now log in.', [
+        { text: 'Go to Login', onPress: () => router.push('/login') }
+      ]);
+    }
   };
 
   const wave1Y = wave1Anim.interpolate({ inputRange: [0, 1], outputRange: [0, -18] });

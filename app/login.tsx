@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, Animated, Dimensions, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { loginUser } from '../utils/auth';
 
 const { width } = Dimensions.get('window');
@@ -104,8 +105,12 @@ export default function LoginScreen() {
                   onChangeText={(text) => { setPassword(text); setFormError(''); }}
                   secureTextEntry={!showPassword}
                 />
-                <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-                  <Text style={styles.eyeIcon}>{showPassword ? '🙈' : '👁️'}</Text>
+                <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeBtn}>
+                  <Ionicons 
+                    name={showPassword ? 'eye-off-outline' : 'eye-outline'} 
+                    size={22} 
+                    color="#FF6B6B" 
+                  />
                 </TouchableOpacity>
               </View>
             </View>
@@ -175,7 +180,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5, borderColor: 'rgba(255,107,107,0.25)',
   },
   input: { flex: 1, color: '#CC3D3D', fontSize: 15, paddingVertical: 16, fontWeight: '500' },
-  eyeIcon: { fontSize: 18, paddingLeft: 8 },
+  eyeBtn: { paddingLeft: 8 },
   forgotWrap: { alignItems: 'flex-end', marginBottom: 24, marginTop: -6 },
   forgotText: { color: '#FF6B6B', fontSize: 13, fontWeight: '600' },
   formErrorText: { color: '#FF4D4D', fontSize: 13, fontWeight: '700', textAlign: 'center', marginBottom: 12 },

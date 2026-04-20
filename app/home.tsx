@@ -22,7 +22,7 @@ export default function HomeScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [scannerVisible, setScannerVisible] = useState(false);
   const [scanning, setScanning] = useState(false);
-  const [scanResult, setScanResult] = useState<ScanResult>(null);
+  const [scanResult, setScanResult] = useState<ScanResult | null>(null);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
 
   // Calorie ring

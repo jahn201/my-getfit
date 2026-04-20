@@ -1,148 +1,261 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Animated, Dimensions, Modal, Image } from 'react-native';
+import React, { useState } from 'react';
+import {
+  View, Text, StyleSheet, ScrollView, TouchableOpacity,
+  Dimensions, Modal, Image
+} from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Svg, Circle } from 'react-native-svg';
 
 const { width } = Dimensions.get('window');
+
+// ─────────────────────────────────────────────
+// SETTINGS — edit these as needed
+// ─────────────────────────────────────────────
 const GOAL = 2200;
-const CONSUMED = 980;
 
+// ─────────────────────────────────────────────
+// CAT IMAGES — replace null with require('./assets/cat_0.png') etc.
+// Thresholds:  0% = 0–24%  |  25% = 25–49%
+//             50% = 50–74% |  75% = 75–99%  |  100% = 100%+
+// ─────────────────────────────────────────────
+const CAT_IMAGES: Record<number, any> = {
+  0:   require('../assets/cat_0.png'),
+  25:  require('../assets/cat_25.png'),
+  50:  require('../assets/cat_50.png'),
+  75:  require('../assets/cat_75.png'),
+  100: require('../assets/cat_100.png'),
+};
+
+function getCatStage(pct) {
+  if (pct >= 100) return 100;
+  if (pct >= 75) return 75;
+  if (pct >= 50) return 50;
+  if (pct >= 25) return 25;
+  return 0;
+}
+
+// ─────────────────────────────────────────────
+// Date helpers
+// ─────────────────────────────────────────────
+const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+
+function formatDate(date) {
+  const today = new Date();
+  const isToday =
+    date.getDate() === today.getDate() &&
+    date.getMonth() === today.getMonth() &&
+    date.getFullYear() === today.getFullYear();
+  const dayLabel = isToday
+    ? 'TODAY'
+    : date.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase();
+  return `${dayLabel}, ${MONTHS[date.getMonth()]} ${date.getDate()}`;
+}
+
+// ─────────────────────────────────────────────
+// Component
+// ─────────────────────────────────────────────
 export default function HomeScreen() {
+  const [consumed] = useState(980);   // replace with real state/prop
   const [modalVisible, setModalVisible] = useState(false);
+  const [activeDate, setActiveDate] = useState(new Date());
 
-  // Circular Progress Logic
-  const size = 240;
-  const strokeWidth = 18;
-  const radius = (size - strokeWidth) / 2;
-  const circumference = radius * 2 * Math.PI;
-  const progress = CONSUMED / GOAL;
-  const strokeDashoffset = circumference - progress * circumference;
+  // Ring math
+  const SIZE = 150;
+  const STROKE = 11;
+  const RADIUS = (SIZE - STROKE) / 2;
+  const CIRCUMFERENCE = RADIUS * 2 * Math.PI;
+  const progress = Math.min(consumed / GOAL, 1);
+  const dashOffset = CIRCUMFERENCE - progress * CIRCUMFERENCE;
+
+  // Cat
+  const pct = Math.round(progress * 100);
+  const stage = getCatStage(pct);
+  const catSrc = CAT_IMAGES[stage];
+
+  // Date nav
+  const prevDay = () => {
+    const d = new Date(activeDate);
+    d.setDate(d.getDate() - 1);
+    setActiveDate(d);
+  };
+  const nextDay = () => {
+    const d = new Date(activeDate);
+    d.setDate(d.getDate() + 1);
+    setActiveDate(d);
+  };
+
+  const MEALS = [
+    { key: 'breakfast', label: 'Breakfast', rec: '288 – 403 kcal', dot: '#FF7F50' },
+    { key: 'lunch', label: 'Lunch', rec: '345 – 460 kcal', dot: '#F08080' },
+    { key: 'dinner', label: 'Dinner', rec: '449 – 587 kcal', dot: '#FFB347' },
+    { key: 'snacks', label: 'Snacks', rec: '100 – 200 kcal', dot: '#DDA0DD' },
+  ];
 
   return (
-    <View style={styles.container}>
-      <ScrollView style={styles.body} showsVerticalScrollIndicator={false}>
+    <View style={s.container}>
+      <ScrollView style={s.scroll} showsVerticalScrollIndicator={false}>
 
-        {/* Header Section */}
-        <View style={styles.header}>
-          <Text style={styles.greeting}>Good morning</Text>
-          <Text style={styles.userName}>Let's crush it today!</Text>
-        </View>
+        {/* ── HEADER ───────────────────────────── */}
+        <LinearGradient
+          colors={['#ffffff', '#ffe8e0', '#ffcbb5']}
+          start={{ x: 0.1, y: 0 }}
+          end={{ x: 0.9, y: 1 }}
+          style={s.header}
+        >
+          <Text style={s.appTitle}>NutriCat</Text>
 
-        {/* Circular Progress Section */}
-        <View style={styles.circleContainer}>
-          <Svg width={size} height={size}>
-            {/* Background Circle */}
-            <Circle
-              stroke="rgba(255, 255, 255, 0.05)"
-              fill="none"
-              cx={size / 2}
-              cy={size / 2}
-              r={radius}
-              strokeWidth={strokeWidth}
-            />
-            {/* Progress Circle (Coral Pink) */}
-            <Circle
-              stroke="#FF7F50"
-              fill="none"
-              cx={size / 2}
-              cy={size / 2}
-              r={radius}
-              strokeWidth={strokeWidth}
-              strokeDasharray={circumference}
-              strokeDashoffset={strokeDashoffset}
-              strokeLinecap="round"
-              rotation="-90"
-              origin={`${size / 2}, ${size / 2}`}
-            />
-          </Svg>
+          <View style={s.circleRow}>
+            {/* Left stat */}
+            <View style={s.sideStat}>
+              <Text style={s.sideVal}>{consumed}</Text>
+              <Text style={s.sideLbl}>EATEN</Text>
+            </View>
 
-          {/* Inner Content: Pixel Cat & Calories */}
-          <View style={styles.innerCircleContent}>
-            <Image
-              source={{ uri: 'https://i.imgur.com/your-pixel-cat-link.png' }} // REPLACE WITH LOCAL PATH OR URL
-              style={styles.pixelCat}
-            />
-            <Text style={styles.calBigNumber}>{CONSUMED}</Text>
-            <Text style={styles.calSubText}>of {GOAL} kcal</Text>
+            {/* Progress ring */}
+            <View style={s.ringWrap}>
+              <Svg width={SIZE} height={SIZE}>
+                {/* Track */}
+                <Circle
+                  cx={SIZE / 2} cy={SIZE / 2} r={RADIUS}
+                  fill="none"
+                  stroke="rgba(255,127,80,0.12)"
+                  strokeWidth={STROKE}
+                />
+                {/* Fill */}
+                <Circle
+                  cx={SIZE / 2} cy={SIZE / 2} r={RADIUS}
+                  fill="none"
+                  stroke="#FF7F50"
+                  strokeWidth={STROKE}
+                  strokeDasharray={CIRCUMFERENCE}
+                  strokeDashoffset={dashOffset}
+                  strokeLinecap="round"
+                  rotation="-90"
+                  origin={`${SIZE / 2}, ${SIZE / 2}`}
+                />
+              </Svg>
+
+              {/* Cat + calories inside ring */}
+              <View style={s.ringInner}>
+                {catSrc ? (
+                  <Image source={catSrc} style={s.catImg} />
+                ) : (
+                  // Placeholder shown until you supply images
+                  <View style={s.catPlaceholder}>
+                    <Text style={s.catPlaceholderTxt}>CAT{'\n'}{stage}%</Text>
+                  </View>
+                )}
+                <Text style={s.kcalNum}>{consumed}</Text>
+                <Text style={s.kcalSub}>of {GOAL} kcal</Text>
+              </View>
+            </View>
+
+            {/* Right stat */}
+            <View style={s.sideStat}>
+              <Text style={s.sideVal}>0</Text>
+              <Text style={s.sideLbl}>BURNED</Text>
+            </View>
           </View>
+
+          <TouchableOpacity style={s.seeStatsBtn}>
+            <Text style={s.seeStatsTxt}>SEE STATS  ▾</Text>
+          </TouchableOpacity>
+        </LinearGradient>
+
+        {/* ── MACROS ───────────────────────────── */}
+        <View style={s.macrosRow}>
+          {[
+            { name: 'Carbs', val: '0 / 144g' },
+            { name: 'Protein', val: '0 / 58g' },
+            { name: 'Fat', val: '0 / 38g' },
+          ].map((m, i, arr) => (
+            <View
+              key={m.name}
+              style={[s.macroCell, i < arr.length - 1 && s.macroBorder]}
+            >
+              <Text style={s.macroName}>{m.name}</Text>
+              <Text style={s.macroVal}>{m.val}</Text>
+            </View>
+          ))}
         </View>
 
-        {/* Stats Row */}
-        <View style={styles.statsRow}>
-          {[
-            { label: 'Protein', val: '87g', color: '#FF7F50' },
-            { label: 'Carbs', val: '122g', color: '#F08080' },
-            { label: 'Fats', val: '42g', color: '#FFA07A' },
-          ].map((item) => (
-            <View key={item.label} style={styles.statBox}>
-              <Text style={[styles.statVal, { color: item.color }]}>{item.val}</Text>
-              <Text style={styles.statLabel}>{item.label}</Text>
+        {/* ── DATE SWITCHER ────────────────────── */}
+        <View style={s.dateSwitcher}>
+          <TouchableOpacity onPress={prevDay} style={s.dateArrow}>
+            <Text style={s.dateArrowTxt}>‹</Text>
+          </TouchableOpacity>
+          <Text style={s.dateLabel}>{formatDate(activeDate)}</Text>
+          <TouchableOpacity onPress={nextDay} style={s.dateArrow}>
+            <Text style={s.dateArrowTxt}>›</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* ── MEAL ROWS ────────────────────────── */}
+        <View style={s.mealsSection}>
+          {MEALS.map((meal) => (
+            <View key={meal.key} style={s.mealRow}>
+              <View style={[s.mealDot, { backgroundColor: meal.dot }]} />
+              <View style={s.mealInfo}>
+                <Text style={s.mealName}>{meal.label}</Text>
+                <Text style={s.mealRec}>Recommended: {meal.rec}</Text>
+              </View>
+              <TouchableOpacity style={s.mealAdd}>
+                <Text style={s.mealAddTxt}>+</Text>
+              </TouchableOpacity>
             </View>
           ))}
         </View>
 
       </ScrollView>
 
-      {/* Bottom Nav with Plus Button */}
-      <View style={styles.bottomNav}>
-        <TouchableOpacity style={styles.navItem}><Text style={styles.navLabelActive}>Home</Text></TouchableOpacity>
+      {/* ── BOTTOM NAV ───────────────────────── */}
+      <View style={s.bottomNav}>
+        <TouchableOpacity style={s.navItem}>
+          <Text style={s.navActive}>Diary</Text>
+        </TouchableOpacity>
 
         <TouchableOpacity
-          style={styles.plusButtonContainer}
+          style={s.plusWrap}
           onPress={() => setModalVisible(true)}
-          activeOpacity={0.9}
+          activeOpacity={0.85}
         >
-          <LinearGradient colors={['#FF7F50', '#F08080']} style={styles.plusButton}>
-            <Text style={styles.plusIcon}>+</Text>
+          <LinearGradient colors={['#FF7F50', '#F08080']} style={s.plusBtn}>
+            <Text style={s.plusTxt}>+</Text>
           </LinearGradient>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.navItem}><Text style={styles.navLabel}>Profile</Text></TouchableOpacity>
+        <TouchableOpacity style={s.navItem}>
+          <Text style={s.navInactive}>Goals</Text>
+        </TouchableOpacity>
       </View>
 
-      {/* ADD MEAL POPUP */}
+      {/* ── ADD MEAL MODAL ───────────────────── */}
       <Modal
         animationType="slide"
-        transparent={true}
+        transparent
         visible={modalVisible}
         onRequestClose={() => setModalVisible(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>ADD MEAL</Text>
-              <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.closeBtnArea}>
-                <Text style={styles.closeBtn}>✕</Text>
+        <View style={s.modalOverlay}>
+          <View style={s.modalSheet}>
+            <View style={s.modalHeader}>
+              <Text style={s.modalTitle}>ADD MEAL</Text>
+              <TouchableOpacity onPress={() => setModalVisible(false)}>
+                <Text style={s.modalClose}>✕</Text>
               </TouchableOpacity>
             </View>
 
-            {/* Three Squares Row */}
-            <View style={styles.squareRow}>
-              <TouchableOpacity style={styles.squareOption}>
-                <View style={styles.squareInner}>
-                  <Text style={styles.squareText}>SEARCH</Text>
-                  <Text style={styles.squareSubText}>FOOD</Text>
-                </View>
-              </TouchableOpacity>
-
-              <TouchableOpacity style={styles.squareOption}>
-                <View style={styles.squareInner}>
-                  <Text style={styles.squareText}>MEAL</Text>
-                  <Text style={styles.squareSubText}>SCAN</Text>
-                </View>
-              </TouchableOpacity>
-
-              <TouchableOpacity style={styles.squareOption}>
-                <View style={styles.squareInner}>
-                  <Text style={styles.squareText}>MANUAL</Text>
-                  <Text style={styles.squareSubText}>ENTRY</Text>
-                </View>
-              </TouchableOpacity>
+            <View style={s.modalGrid}>
+              {['SEARCH\nFOOD', 'MEAL\nSCAN', 'MANUAL\nENTRY'].map((label) => (
+                <TouchableOpacity key={label} style={s.modalCard}>
+                  <Text style={s.modalCardTxt}>{label}</Text>
+                </TouchableOpacity>
+              ))}
             </View>
 
             <TouchableOpacity onPress={() => setModalVisible(false)}>
-              <LinearGradient colors={['#FF7F50', '#F08080']} style={styles.logBtn}>
-                <Text style={styles.logBtnText}>LOG MEAL</Text>
+              <LinearGradient colors={['#FF7F50', '#F08080']} style={s.logBtn}>
+                <Text style={s.logBtnTxt}>LOG MEAL</Text>
               </LinearGradient>
             </TouchableOpacity>
           </View>
@@ -152,49 +265,83 @@ export default function HomeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#121212' },
-  body: { flex: 1 },
-  header: { paddingTop: 60, paddingHorizontal: 25, marginBottom: 10 },
-  greeting: { color: 'rgba(255,255,255,0.5)', fontSize: 13, fontWeight: '700', letterSpacing: 0.5 },
-  userName: { color: '#fff', fontSize: 26, fontWeight: '900', marginTop: 2 },
+// ─────────────────────────────────────────────
+// Styles
+// ─────────────────────────────────────────────
+const s = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#fafafa' },
+  scroll: { flex: 1 },
 
-  // Circle Progress
-  circleContainer: { alignItems: 'center', justifyContent: 'center', marginVertical: 30 },
-  innerCircleContent: { position: 'absolute', alignItems: 'center', justifyContent: 'center' },
-  pixelCat: { width: 90, height: 90, marginBottom: 5, resizeMode: 'contain' },
-  calBigNumber: { color: '#fff', fontSize: 48, fontWeight: '900' },
-  calSubText: { color: 'rgba(255,255,255,0.4)', fontSize: 13, fontWeight: '700' },
+  // Header
+  header: { paddingTop: 52, paddingBottom: 20, paddingHorizontal: 20, alignItems: 'center' },
+  appTitle: { fontSize: 18, fontWeight: '700', color: '#d9522a', letterSpacing: 0.5, marginBottom: 14 },
+  circleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%' },
+  sideStat: { width: 55, alignItems: 'center' },
+  sideVal: { fontSize: 20, fontWeight: '800', color: '#1a1a1a' },
+  sideLbl: { fontSize: 10, color: '#aaa', fontWeight: '600', letterSpacing: 0.5, marginTop: 2 },
 
-  statsRow: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20 },
-  statBox: { alignItems: 'center', backgroundColor: '#1E1E1E', paddingVertical: 20, borderRadius: 24, width: (width - 60) / 3 },
-  statVal: { fontSize: 18, fontWeight: '900' },
-  statLabel: { color: 'rgba(255,255,255,0.3)', fontSize: 11, fontWeight: '800', marginTop: 4, letterSpacing: 1 },
+  // Ring
+  ringWrap: { width: 150, height: 150, alignItems: 'center', justifyContent: 'center' },
+  ringInner: { position: 'absolute', alignItems: 'center', justifyContent: 'center' },
 
-  // Bottom Nav
-  bottomNav: { flexDirection: 'row', backgroundColor: '#1E1E1E', height: 85, alignItems: 'center', borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)' },
+  // Cat
+  catImg: { width: 72, height: 72, resizeMode: 'contain' },
+  catPlaceholder: {
+    width: 72, height: 72, borderRadius: 8,
+    backgroundColor: 'rgba(255,127,80,0.07)',
+    borderWidth: 1.5, borderColor: 'rgba(255,127,80,0.25)',
+    borderStyle: 'dashed',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  catPlaceholderTxt: { fontSize: 9, color: 'rgba(255,127,80,0.5)', fontWeight: '700', textAlign: 'center', lineHeight: 14 },
+
+  kcalNum: { fontSize: 22, fontWeight: '900', color: '#1a1a1a', marginTop: 4 },
+  kcalSub: { fontSize: 10, color: '#bbb', fontWeight: '600', letterSpacing: 0.4 },
+
+  seeStatsBtn: { marginTop: 10 },
+  seeStatsTxt: { fontSize: 11, fontWeight: '700', color: '#c0441a', letterSpacing: 0.5 },
+
+  // Macros
+  macrosRow: { flexDirection: 'row', backgroundColor: '#fff', borderBottomWidth: 0.5, borderBottomColor: '#f0f0f0' },
+  macroCell: { flex: 1, paddingVertical: 12, alignItems: 'center' },
+  macroBorder: { borderRightWidth: 0.5, borderRightColor: '#f0f0f0' },
+  macroName: { fontSize: 11, color: '#bbb', fontWeight: '600', letterSpacing: 0.3 },
+  macroVal: { fontSize: 13, fontWeight: '800', color: '#1a1a1a', marginTop: 2 },
+
+  // Date
+  dateSwitcher: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8, paddingHorizontal: 14, backgroundColor: '#fff', borderBottomWidth: 0.5, borderBottomColor: '#f0f0f0' },
+  dateArrow: { paddingHorizontal: 10, paddingVertical: 4 },
+  dateArrowTxt: { fontSize: 22, color: '#ccc', fontWeight: '300' },
+  dateLabel: { fontSize: 12, fontWeight: '700', color: '#666', letterSpacing: 0.3 },
+
+  // Meals
+  mealsSection: { paddingHorizontal: 12, paddingTop: 10, paddingBottom: 100 },
+  mealRow: { backgroundColor: '#fff', borderRadius: 14, marginBottom: 9, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 0.5, borderColor: '#f0f0f0' },
+  mealDot: { width: 10, height: 10, borderRadius: 5 },
+  mealInfo: { flex: 1 },
+  mealName: { fontSize: 14, fontWeight: '700', color: '#1a1a1a' },
+  mealRec: { fontSize: 11, color: '#ccc', marginTop: 2 },
+  mealAdd: { width: 30, height: 30, borderRadius: 15, borderWidth: 1.5, borderColor: '#FF7F50', alignItems: 'center', justifyContent: 'center' },
+  mealAddTxt: { fontSize: 20, fontWeight: '300', color: '#FF7F50', lineHeight: 24 },
+
+  // Bottom nav
+  bottomNav: { flexDirection: 'row', backgroundColor: '#fff', height: 80, alignItems: 'center', borderTopWidth: 0.5, borderTopColor: '#f0f0f0' },
   navItem: { flex: 1, alignItems: 'center' },
-  navLabel: { color: 'rgba(255,255,255,0.3)', fontSize: 12, fontWeight: '800' },
-  navLabelActive: { color: '#FF7F50', fontSize: 12, fontWeight: '800' },
-  plusButtonContainer: { bottom: 35 },
-  plusButton: { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center', elevation: 8, shadowColor: '#FF7F50', shadowOpacity: 0.4, shadowRadius: 12 },
-  plusIcon: { color: '#fff', fontSize: 40, fontWeight: '200' },
+  navActive: { fontSize: 11, fontWeight: '700', color: '#FF7F50' },
+  navInactive: { fontSize: 11, fontWeight: '700', color: '#ccc' },
+  plusWrap: { bottom: 20 },
+  plusBtn: { width: 58, height: 58, borderRadius: 29, alignItems: 'center', justifyContent: 'center', shadowColor: '#FF7F50', shadowOpacity: 0.35, shadowRadius: 10, elevation: 6 },
+  plusTxt: { color: '#fff', fontSize: 32, fontWeight: '200' },
 
-  // Modal (Popup)
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'flex-end' },
-  modalContent: { backgroundColor: '#1E1E1E', borderTopLeftRadius: 35, borderTopRightRadius: 35, padding: 25, paddingBottom: 50 },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 30 },
-  modalTitle: { color: '#fff', fontSize: 18, fontWeight: '900', letterSpacing: 1 },
-  closeBtnArea: { padding: 5 },
-  closeBtn: { color: 'rgba(255,255,255,0.3)', fontSize: 18 },
-
-  // Square Grid
-  squareRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 12, marginBottom: 30 },
-  squareOption: { flex: 1, aspectRatio: 1, backgroundColor: '#262626', borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255,127,80,0.1)' },
-  squareInner: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  squareText: { color: '#FF7F50', fontSize: 12, fontWeight: '900', letterSpacing: 1 },
-  squareSubText: { color: 'rgba(255,255,255,0.4)', fontSize: 9, fontWeight: '800', marginTop: 4 },
-
-  logBtn: { borderRadius: 20, paddingVertical: 20, alignItems: 'center' },
-  logBtnText: { color: '#fff', fontWeight: '900', letterSpacing: 2, fontSize: 15 }
+  // Modal
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
+  modalSheet: { backgroundColor: '#fff', borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 24, paddingBottom: 48 },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 28 },
+  modalTitle: { fontSize: 16, fontWeight: '900', color: '#1a1a1a', letterSpacing: 1 },
+  modalClose: { fontSize: 18, color: '#ccc' },
+  modalGrid: { flexDirection: 'row', gap: 10, marginBottom: 24 },
+  modalCard: { flex: 1, aspectRatio: 1, backgroundColor: '#fafafa', borderRadius: 18, borderWidth: 1, borderColor: 'rgba(255,127,80,0.15)', alignItems: 'center', justifyContent: 'center' },
+  modalCardTxt: { fontSize: 11, fontWeight: '900', color: '#FF7F50', textAlign: 'center', letterSpacing: 0.8, lineHeight: 16 },
+  logBtn: { borderRadius: 18, paddingVertical: 18, alignItems: 'center' },
+  logBtnTxt: { color: '#fff', fontWeight: '900', letterSpacing: 2, fontSize: 14 },
 });

@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Animated, KeyboardAvoidingView, Platform, ScrollView, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, Animated, KeyboardAvoidingView, Platform, ScrollView, Dimensions, Alert, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
+import { registerUser } from '../utils/auth';
 
 const { width } = Dimensions.get('window');
 
@@ -11,6 +12,8 @@ export default function RegisterScreen() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [formError, setFormError] = useState('');
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(40)).current;
   const wave1Anim = useRef(new Animated.Value(0)).current;
@@ -35,6 +38,33 @@ export default function RegisterScreen() {
     waveLoop(wave2Anim, 600);
     waveLoop(wave3Anim, 1200);
   }, []);
+
+  const handleRegister = async () => {
+    setFormError('');
+
+    if (!name || !email || !password || !confirmPassword) {
+      setFormError('Please fill in all fields.');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setFormError("Passwords don't match.");
+      return;
+    }
+
+    setLoading(true);
+    const error = await registerUser(name, email, password);
+    setLoading(false);
+
+    if (error) {
+      setFormError(error);
+      return;
+    }
+
+    Alert.alert('Success 🎉', 'Account created successfully! You can now log in.', [
+      { text: 'Go to Login', onPress: () => router.push('/login') }
+    ]);
+  };
 
   const wave1Y = wave1Anim.interpolate({ inputRange: [0, 1], outputRange: [0, -18] });
   const wave2Y = wave2Anim.interpolate({ inputRange: [0, 1], outputRange: [0, -14] });
@@ -74,7 +104,7 @@ export default function RegisterScreen() {
                     placeholder={field.placeholder}
                     placeholderTextColor="rgba(180,80,60,0.4)"
                     value={field.value}
-                    onChangeText={field.setter}
+                    onChangeText={(text) => { field.setter(text); setFormError(''); }}
                     keyboardType={field.type as any}
                     autoCapitalize={field.type === 'email-address' ? 'none' : 'words'}
                   />
@@ -90,7 +120,7 @@ export default function RegisterScreen() {
                   placeholder="Min. 8 characters"
                   placeholderTextColor="rgba(180,80,60,0.4)"
                   value={password}
-                  onChangeText={setPassword}
+                  onChangeText={(text) => { setPassword(text); setFormError(''); }}
                   secureTextEntry={!showPassword}
                 />
                 <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
@@ -107,7 +137,7 @@ export default function RegisterScreen() {
                   placeholder="Repeat password"
                   placeholderTextColor="rgba(180,80,60,0.4)"
                   value={confirmPassword}
-                  onChangeText={setConfirmPassword}
+                  onChangeText={(text) => { setConfirmPassword(text); setFormError(''); }}
                   secureTextEntry={!showPassword}
                 />
               </View>
@@ -116,8 +146,14 @@ export default function RegisterScreen() {
               )}
             </View>
 
-            <TouchableOpacity onPress={() => router.push('/home')} activeOpacity={0.85} style={styles.registerBtn}>
-              <Text style={styles.registerBtnText}>CREATE ACCOUNT</Text>
+            {formError ? <Text style={styles.formErrorText}>{formError}</Text> : null}
+
+            <TouchableOpacity onPress={handleRegister} activeOpacity={0.85} style={[styles.registerBtn, loading && styles.registerBtnDisabled]} disabled={loading}>
+              {loading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.registerBtnText}>CREATE ACCOUNT</Text>
+              )}
             </TouchableOpacity>
 
             <View style={styles.divider}>
@@ -174,6 +210,7 @@ const styles = StyleSheet.create({
   input: { flex: 1, color: '#CC3D3D', fontSize: 15, paddingVertical: 16, fontWeight: '500' },
   eyeIcon: { fontSize: 18, paddingLeft: 8 },
   errorText: { color: '#FF4D4D', fontSize: 12, marginTop: 4, fontWeight: '600' },
+  formErrorText: { color: '#FF4D4D', fontSize: 13, fontWeight: '700', textAlign: 'center', marginBottom: 12 },
 
   registerBtn: {
     width: '100%', backgroundColor: '#FF6B6B', borderRadius: 18,
@@ -181,6 +218,7 @@ const styles = StyleSheet.create({
     shadowColor: '#FF6B6B', shadowOpacity: 0.4, shadowRadius: 14, shadowOffset: { width: 0, height: 6 },
   },
   registerBtnText: { color: '#fff', fontWeight: '900', fontSize: 16, letterSpacing: 2 },
+  registerBtnDisabled: { opacity: 0.6 },
 
   divider: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
   dividerLine: { flex: 1, height: 1, backgroundColor: 'rgba(255,107,107,0.2)' },

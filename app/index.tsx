@@ -1,11 +1,15 @@
 import { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Animated, TouchableOpacity, Dimensions, Image } from 'react-native';
+import { View, Text, StyleSheet, Animated, TouchableOpacity, Dimensions, Image, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useFonts, PressStart2P_400Regular } from '@expo-google-fonts/press-start-2p';
 
 const { width, height } = Dimensions.get('window');
 
 export default function SplashScreen() {
   const router = useRouter();
+  const [fontsLoaded] = useFonts({
+    PressStart2P_400Regular,
+  });
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(60)).current;
   const scaleAnim = useRef(new Animated.Value(0.8)).current;
@@ -33,6 +37,14 @@ export default function SplashScreen() {
     waveLoop(wave3Anim, 1200);
   }, []);
 
+  if (!fontsLoaded) {
+    return (
+      <View style={[styles.container, { backgroundColor: '#FFF0EC' }]}>
+        <ActivityIndicator size="large" color="#FF6B6B" />
+      </View>
+    );
+  }
+
   const wave1Y = wave1Anim.interpolate({ inputRange: [0, 1], outputRange: [0, -18] });
   const wave2Y = wave2Anim.interpolate({ inputRange: [0, 1], outputRange: [0, -14] });
   const wave3Y = wave3Anim.interpolate({ inputRange: [0, 1], outputRange: [0, -10] });
@@ -54,7 +66,7 @@ export default function SplashScreen() {
             <View style={styles.screen}>
               {/* PASTE YOUR LOGO IMAGE in assets/images/logo.png then use this: */}
               <Image
-                source={require('../assets/Logo.png')}
+                source={require('../assets/logo.png')}
                 style={styles.logoImage}
                 resizeMode="contain"
               />
@@ -126,13 +138,13 @@ const styles = StyleSheet.create({
   deviceBtn: { width: 18, height: 18, borderRadius: 9, backgroundColor: '#FF8C69', borderWidth: 2, borderColor: 'rgba(255,255,255,0.4)' },
   deviceBtnMid: { width: 24, height: 24, borderRadius: 12, backgroundColor: '#FFD700' },
 
-  appName: { fontSize: 52, fontWeight: '900', color: '#CC3D3D', letterSpacing: 4, textShadowColor: 'rgba(255,107,107,0.3)', textShadowOffset: { width: 2, height: 2 }, textShadowRadius: 6 },
-  tagline: { fontSize: 12, fontWeight: '800', color: '#FF6B6B', letterSpacing: 8, marginTop: 4 },
-  sub: { fontSize: 14, color: '#FF8C69', marginTop: 10, fontWeight: '600' },
+  appName: { fontSize: 32, fontFamily: 'PressStart2P_400Regular', color: '#CC3D3D', letterSpacing: 2, textShadowColor: 'rgba(255,107,107,0.3)', textShadowOffset: { width: 2, height: 2 }, textShadowRadius: 6 },
+  tagline: { fontSize: 8, fontFamily: 'PressStart2P_400Regular', color: '#FF6B6B', letterSpacing: 2, marginTop: 12 },
+  sub: { fontSize: 9, color: '#FF8C69', marginTop: 14, fontFamily: 'PressStart2P_400Regular', lineHeight: 16, textAlign: 'center', paddingHorizontal: 20 },
 
   buttons: { position: 'absolute', bottom: 60, width: width - 48, alignItems: 'center' },
   btnPrimary: { width: '100%', backgroundColor: '#FF6B6B', borderRadius: 18, paddingVertical: 18, alignItems: 'center', marginBottom: 14, shadowColor: '#FF6B6B', shadowOpacity: 0.4, shadowRadius: 14, shadowOffset: { width: 0, height: 6 } },
-  btnPrimaryText: { color: '#fff', fontWeight: '900', fontSize: 16, letterSpacing: 2 },
+  btnPrimaryText: { color: '#fff', fontFamily: 'PressStart2P_400Regular', fontSize: 12, letterSpacing: 1 },
   btnSecondary: { paddingVertical: 10 },
-  btnSecondaryText: { color: '#FF6B6B', fontWeight: '700', fontSize: 14 },
+  btnSecondaryText: { color: '#FF6B6B', fontFamily: 'PressStart2P_400Regular', fontSize: 9 },
 });

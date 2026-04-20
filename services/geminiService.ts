@@ -137,5 +137,67 @@ export async function analyzeFoodImage(base64Image: string): Promise<ScanResult>
     throw new Error('Could not understand the AI response. Please try again.');
   }
 
+
+  return parsed;
+}
+
+/**
+ * Searches for nutritional information based on a text query (e.g., "1 bowl of oatmeal with bananas").
+ * Uses the same Gemini model as the image analysis.
+ */
+export async function searchFoodNutrition(query: string): Promise<ScanResult> {
+  if (!query || query.trim().length < 2) {
+    throw new Error('Please enter a food name or description.');
+  }
+
+  const GEMINI_API_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY ?? '';
+
+  if (!GEMINI_API_KEY) {
+    console.warn('geminiService: EXPO_PUBLIC_GEMINI_API_KEY is not set. Returning demo meal.');
+    return getRandomDemoMeal();
+  }
+
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${GEMINI_API_KEY}`;
+
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [
+        {
+          parts: [
+            {
+              text: `You are a food nutrition expert. A user wants to know the nutritional info for this food: "${query}". Return ONLY a raw JSON object with NO markdown, NO backticks, NO explanation. Exactly this format: {"food":"exact food name","calories":estimated_integer,"protein":"Xg","carbs":"Xg","fats":"Xg","description":"one short description","healthTip":"one short health tip"}`,
+            },
+          ],
+        },
+      ],
+      generationConfig: {
+        response_mime_type: 'application/json',
+        temperature: 0.2,
+      },
+    }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    const message: string = errorData?.error?.message ?? `API error ${response.status}`;
+    
+    // Fallback to demo for quota issues
+    if (message.toLowerCase().includes('quota') || message.toLowerCase().includes('api key')) {
+      return getRandomDemoMeal();
+    }
+    throw new Error(message);
+  }
+
+  const data = await response.json();
+  const text: string = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+  const clean = text.replace(/```json|```/g, '').trim();
+  const parsed: ScanResult = JSON.parse(clean);
+
+  if (!parsed.food || parsed.calories === undefined) {
+    throw new Error('Could not understand the AI response.');
+  }
+
   return parsed;
 }

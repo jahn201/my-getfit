@@ -2,12 +2,16 @@ import { useState, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, Animated, Dimensions, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useFonts, PressStart2P_400Regular } from '@expo-google-fonts/press-start-2p';
 import { loginUser } from '../utils/auth';
 
 const { width } = Dimensions.get('window');
 
 export default function LoginScreen() {
   const router = useRouter();
+  const [fontsLoaded] = useFonts({
+    PressStart2P_400Regular,
+  });
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -37,6 +41,14 @@ export default function LoginScreen() {
     waveLoop(wave2Anim, 600);
     waveLoop(wave3Anim, 1200);
   }, []);
+
+  if (!fontsLoaded) {
+    return (
+      <View style={[styles.container, { backgroundColor: '#FFF0EC', justifyContent: 'center' }]}>
+        <ActivityIndicator size="large" color="#FF6B6B" />
+      </View>
+    );
+  }
 
   const handleLogin = async () => {
     setFormError('');
@@ -166,36 +178,36 @@ const styles = StyleSheet.create({
   scroll: { flexGrow: 1, paddingHorizontal: 24, paddingBottom: 60, width: width },
   header: { paddingTop: 60, marginBottom: 32 },
   backBtn: { marginBottom: 24 },
-  backText: { color: '#FF6B6B', fontSize: 15, fontWeight: '600' },
-  title: { fontSize: 44, fontWeight: '900', color: '#CC3D3D', lineHeight: 48, letterSpacing: 1 },
-  subtitle: { color: '#FF8C69', fontSize: 14, marginTop: 10, fontWeight: '500' },
+  backText: { color: '#FF6B6B', fontSize: 9, fontFamily: 'PressStart2P_400Regular' },
+  title: { fontSize: 24, color: '#CC3D3D', lineHeight: 32, fontFamily: 'PressStart2P_400Regular' },
+  subtitle: { color: '#FF8C69', fontSize: 9, marginTop: 14, fontFamily: 'PressStart2P_400Regular', lineHeight: 16 },
 
   form: { flex: 1 },
   inputGroup: { marginBottom: 18 },
-  label: { color: '#FF6B6B', fontSize: 11, fontWeight: '800', letterSpacing: 3, marginBottom: 8 },
+  label: { color: '#FF6B6B', fontSize: 8, letterSpacing: 1, marginBottom: 12, fontFamily: 'PressStart2P_400Regular' },
   inputWrap: {
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: 'rgba(255,107,107,0.08)',
     borderRadius: 14, paddingHorizontal: 16,
     borderWidth: 1.5, borderColor: 'rgba(255,107,107,0.25)',
   },
-  input: { flex: 1, color: '#CC3D3D', fontSize: 15, paddingVertical: 16, fontWeight: '500' },
+  input: { flex: 1, color: '#CC3D3D', fontSize: 11, paddingVertical: 16, fontFamily: 'PressStart2P_400Regular' },
   eyeBtn: { paddingLeft: 8 },
   forgotWrap: { alignItems: 'flex-end', marginBottom: 24, marginTop: -6 },
-  forgotText: { color: '#FF6B6B', fontSize: 13, fontWeight: '600' },
-  formErrorText: { color: '#FF4D4D', fontSize: 13, fontWeight: '700', textAlign: 'center', marginBottom: 12 },
+  forgotText: { color: '#FF6B6B', fontSize: 8, fontFamily: 'PressStart2P_400Regular' },
+  formErrorText: { color: '#FF4D4D', fontSize: 8, textAlign: 'center', marginBottom: 12, fontFamily: 'PressStart2P_400Regular', lineHeight: 14 },
 
   loginBtn: {
     width: '100%', backgroundColor: '#FF6B6B', borderRadius: 18,
     paddingVertical: 18, alignItems: 'center', marginBottom: 24,
     shadowColor: '#FF6B6B', shadowOpacity: 0.4, shadowRadius: 14, shadowOffset: { width: 0, height: 6 },
   },
-  loginBtnText: { color: '#fff', fontWeight: '900', fontSize: 16, letterSpacing: 2 },
+  loginBtnText: { color: '#fff', fontSize: 12, letterSpacing: 1, fontFamily: 'PressStart2P_400Regular' },
   loginBtnDisabled: { opacity: 0.6 },
 
   divider: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
   dividerLine: { flex: 1, height: 1, backgroundColor: 'rgba(255,107,107,0.2)' },
-  dividerText: { color: '#FF8C69', marginHorizontal: 14, fontSize: 12, fontWeight: '700', letterSpacing: 2 },
+  dividerText: { color: '#FF8C69', marginHorizontal: 14, fontSize: 8, letterSpacing: 1, fontFamily: 'PressStart2P_400Regular' },
 
   googleBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
@@ -203,10 +215,10 @@ const styles = StyleSheet.create({
     gap: 10, borderWidth: 1.5, borderColor: 'rgba(255,107,107,0.2)',
     shadowColor: '#FF6B6B', shadowOpacity: 0.1, shadowRadius: 8, shadowOffset: { width: 0, height: 4 },
   },
-  googleIcon: { fontSize: 18, fontWeight: '900', color: '#EA4335' },
-  googleText: { color: '#CC3D3D', fontWeight: '700', fontSize: 15 },
+  googleIcon: { fontSize: 14, fontFamily: 'PressStart2P_400Regular', color: '#EA4335' },
+  googleText: { color: '#CC3D3D', fontSize: 9, fontFamily: 'PressStart2P_400Regular' },
 
   registerRow: { flexDirection: 'row', justifyContent: 'center' },
-  registerText: { color: '#FF8C69', fontSize: 14 },
-  registerLink: { color: '#FF6B6B', fontWeight: '800', fontSize: 14 },
+  registerText: { color: '#FF8C69', fontSize: 9, fontFamily: 'PressStart2P_400Regular' },
+  registerLink: { color: '#FF6B6B', fontSize: 9, fontFamily: 'PressStart2P_400Regular' },
 });

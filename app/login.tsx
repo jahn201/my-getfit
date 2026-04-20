@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Animated, Dimensions, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, Animated, Dimensions, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
+import { loginUser } from '../utils/auth';
 
 const { width } = Dimensions.get('window');
 
@@ -9,6 +10,8 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [formError, setFormError] = useState('');
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(40)).current;
   const wave1Anim = useRef(new Animated.Value(0)).current;
@@ -33,6 +36,21 @@ export default function LoginScreen() {
     waveLoop(wave2Anim, 600);
     waveLoop(wave3Anim, 1200);
   }, []);
+
+  const handleLogin = async () => {
+    setFormError('');
+    setLoading(true);
+    const result = await loginUser(email, password);
+    setLoading(false);
+
+    if ('error' in result) {
+      setFormError(result.error);
+      return;
+    }
+
+    // Success - navigate to home
+    router.push('/home');
+  };
 
   const wave1Y = wave1Anim.interpolate({ inputRange: [0, 1], outputRange: [0, -18] });
   const wave2Y = wave2Anim.interpolate({ inputRange: [0, 1], outputRange: [0, -14] });
@@ -68,7 +86,7 @@ export default function LoginScreen() {
                   placeholder="you@example.com"
                   placeholderTextColor="rgba(180,80,60,0.4)"
                   value={email}
-                  onChangeText={setEmail}
+                  onChangeText={(text) => { setEmail(text); setFormError(''); }}
                   keyboardType="email-address"
                   autoCapitalize="none"
                 />
@@ -83,7 +101,7 @@ export default function LoginScreen() {
                   placeholder="••••••••"
                   placeholderTextColor="rgba(180,80,60,0.4)"
                   value={password}
-                  onChangeText={setPassword}
+                  onChangeText={(text) => { setPassword(text); setFormError(''); }}
                   secureTextEntry={!showPassword}
                 />
                 <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
@@ -96,8 +114,14 @@ export default function LoginScreen() {
               <Text style={styles.forgotText}>Forgot password?</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity onPress={() => router.push('/home')} activeOpacity={0.85} style={styles.loginBtn}>
-              <Text style={styles.loginBtnText}>LOG IN</Text>
+            {formError ? <Text style={styles.formErrorText}>{formError}</Text> : null}
+
+            <TouchableOpacity onPress={handleLogin} activeOpacity={0.85} style={[styles.loginBtn, loading && styles.loginBtnDisabled]} disabled={loading}>
+              {loading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.loginBtnText}>LOG IN</Text>
+              )}
             </TouchableOpacity>
 
             <View style={styles.divider}>
@@ -154,6 +178,7 @@ const styles = StyleSheet.create({
   eyeIcon: { fontSize: 18, paddingLeft: 8 },
   forgotWrap: { alignItems: 'flex-end', marginBottom: 24, marginTop: -6 },
   forgotText: { color: '#FF6B6B', fontSize: 13, fontWeight: '600' },
+  formErrorText: { color: '#FF4D4D', fontSize: 13, fontWeight: '700', textAlign: 'center', marginBottom: 12 },
 
   loginBtn: {
     width: '100%', backgroundColor: '#FF6B6B', borderRadius: 18,
@@ -161,6 +186,7 @@ const styles = StyleSheet.create({
     shadowColor: '#FF6B6B', shadowOpacity: 0.4, shadowRadius: 14, shadowOffset: { width: 0, height: 6 },
   },
   loginBtnText: { color: '#fff', fontWeight: '900', fontSize: 16, letterSpacing: 2 },
+  loginBtnDisabled: { opacity: 0.6 },
 
   divider: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
   dividerLine: { flex: 1, height: 1, backgroundColor: 'rgba(255,107,107,0.2)' },

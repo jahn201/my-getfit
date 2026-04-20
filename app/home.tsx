@@ -127,7 +127,7 @@ export default function HomeScreen() {
 
               <TouchableOpacity style={styles.squareOption}>
                 <View style={styles.squareInner}>
-                  <Text style={styles.squareText}>AI</Text>
+                  <Text style={styles.squareText}>MEAL</Text>
                   <Text style={styles.squareSubText}>SCAN</Text>
                 </View>
               </TouchableOpacity>

@@ -54,7 +54,7 @@ export default function SplashScreen() {
             <View style={styles.screen}>
               {/* PASTE YOUR LOGO IMAGE in assets/images/logo.png then use this: */}
               <Image
-                source={require('../assets/logo.png')}
+                source={require('../assets/Logo.png')}
                 style={styles.logoImage}
                 resizeMode="contain"
               />

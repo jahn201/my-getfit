@@ -12,7 +12,6 @@ import { analyzeFoodImage, searchFoodNutrition, type ScanResult } from '../servi
 import { useFonts, PressStart2P_400Regular } from '@expo-google-fonts/press-start-2p';
 
 const { width } = Dimensions.get('window');
-// Add this near your other state declarations (top of HomeScreen)
 
 // ─────────────────────────────────────────────
 // CAT IMAGES
@@ -360,6 +359,9 @@ export default function HomeScreen() {
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
 
+  // ── NEW: profile menu ──
+  const [profileMenuVisible, setProfileMenuVisible] = useState(false);
+
   type MealType = 'Breakfast' | 'Lunch' | 'Dinner' | 'Snacks';
   const [meals, setMeals] = useState<Record<MealType, ScanResult[]>>({
     Breakfast: [],
@@ -418,7 +420,6 @@ export default function HomeScreen() {
     }
   };
 
-  // Retake from INSIDE the scanner modal — keep modal open, just re-scan
   const retakePhoto = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
@@ -433,7 +434,6 @@ export default function HomeScreen() {
     if (!result.canceled && result.assets[0].base64) {
       const base64 = result.assets[0].base64;
       setCapturedImage(result.assets[0].uri);
-      // scanner modal is already open — just re-analyze, no state flicker
       analyzeImageWithAI(base64);
     }
   };
@@ -454,7 +454,7 @@ export default function HomeScreen() {
       setCapturedImage(result.assets[0].uri);
       setModalVisible(false);
       setScannerVisible(true);
-      analyzeImageWithAI(base64); // no await — modal already visible
+      analyzeImageWithAI(base64);
     }
   };
 
@@ -474,7 +474,7 @@ export default function HomeScreen() {
       setCapturedImage(result.assets[0].uri);
       setModalVisible(false);
       setScannerVisible(true);
-      analyzeImageWithAI(base64); // no await — modal already visible
+      analyzeImageWithAI(base64);
     }
   };
 
@@ -487,10 +487,10 @@ export default function HomeScreen() {
       confirmLogMeal(selectedMealType, mealToLog);
       setSelectedMealType(null);
     } else {
-      setScannerVisible(false); // ← close scanner FIRST
+      setScannerVisible(false);
       setTimeout(() => {
-        setMealTypeModalVisible(true); // ← then open meal type picker
-      }, 300); // small delay lets the first modal finish closing
+        setMealTypeModalVisible(true);
+      }, 300);
     }
   };
 
@@ -519,10 +519,10 @@ export default function HomeScreen() {
 
     pendingMealRef.current = null;
     setMealTypeModalVisible(false);
-    setScannerVisible(false);      // ← close scanner directly
-    setCapturedImage(null);        // ← clear image directly  
-    setScanResult(null);           // ← clear result directly
-    setScanning(false);            // ← reset scanning directly
+    setScannerVisible(false);
+    setCapturedImage(null);
+    setScanResult(null);
+    setScanning(false);
 
     Alert.alert('✓ Logged!', `${meal.food} added to ${type}`);
   };
@@ -560,7 +560,7 @@ export default function HomeScreen() {
       healthTip: 'Manual entry logged.'
     };
     setScanResult(newMeal);
-    pendingMealRef.current = newMeal; // ← ADD THIS
+    pendingMealRef.current = newMeal;
     setManualModalVisible(false);
     setManualName('');
     setManualKcal('');
@@ -586,13 +586,37 @@ export default function HomeScreen() {
     return <OnboardingScreen onComplete={handleOnboardingComplete} />;
   }
 
+  // ── Derived profile strings ──
+  const activityLabel = userProfile
+    ? userProfile.activity.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase())
+    : '—';
+  const goalLabel = userProfile
+    ? userProfile.goal.charAt(0).toUpperCase() + userProfile.goal.slice(1)
+    : '—';
+
   // ── MAIN SCREEN ──
   return (
     <View style={styles.container}>
       {activeTab === 'diary' ? (
         <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
           <LinearGradient colors={['#ffffff', '#ffe8e0', '#ffcbb5']} style={styles.header}>
-            <Image source={require('../assets/logo.png')} style={styles.headerLogo} resizeMode="contain" />
+
+            {/* ── TOP BAR: new_logo.png left │ ⋯ menu right ── */}
+            <View style={styles.topBar}>
+              <Image
+                source={require('../assets/new_logo.png')}
+                style={styles.topBarLogo}
+                resizeMode="contain"
+              />
+              <TouchableOpacity
+                style={styles.menuDotsBtn}
+                onPress={() => setProfileMenuVisible(true)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Ionicons name="ellipsis-horizontal" size={22} color="#555" />
+              </TouchableOpacity>
+            </View>
+
             <View style={styles.circleRow}>
               <View style={[styles.sideStat, { paddingRight: 10 }]}>
                 <Text style={styles.sideVal}>{caloriesConsumed}</Text>
@@ -810,6 +834,70 @@ export default function HomeScreen() {
         </TouchableOpacity>
       </View>
 
+      {/* ─────────────────────────────────────────────
+          PROFILE MENU MODAL
+      ───────────────────────────────────────────── */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={profileMenuVisible}
+        onRequestClose={() => setProfileMenuVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>MY PROFILE</Text>
+              <TouchableOpacity onPress={() => setProfileMenuVisible(false)} style={styles.closeBtnArea}>
+                <Text style={styles.closeBtn}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Gender avatar */}
+            <View style={profileStyles.avatarWrap}>
+              <LinearGradient colors={['#FF7F50', '#F08080']} style={profileStyles.avatar}>
+                <Text style={profileStyles.avatarEmoji}>
+                  {userProfile?.sex === 'female' ? '♀' : '♂'}
+                </Text>
+              </LinearGradient>
+            </View>
+
+            {/* Stats grid */}
+            <View style={profileStyles.grid}>
+              {[
+                { label: 'SEX', val: userProfile?.sex === 'female' ? 'Female' : 'Male' },
+                { label: 'AGE', val: userProfile ? `${userProfile.age} yrs` : '—' },
+                { label: 'HEIGHT', val: userProfile ? `${userProfile.height} cm` : '—' },
+                { label: 'WEIGHT', val: userProfile ? `${userProfile.weight} kg` : '—' },
+                { label: 'ACTIVITY', val: activityLabel },
+                { label: 'GOAL', val: goalLabel },
+              ].map(item => (
+                <View key={item.label} style={profileStyles.gridCell}>
+                  <Text style={profileStyles.gridVal}>{item.val}</Text>
+                  <Text style={profileStyles.gridLabel}>{item.label}</Text>
+                </View>
+              ))}
+            </View>
+
+            {/* Calorie badge */}
+            <LinearGradient colors={['#FF7F50', '#F08080']} style={profileStyles.calorieBadge}>
+              <Text style={profileStyles.calorieNum}>{calorieGoal}</Text>
+              <Text style={profileStyles.calorieUnit}>kcal daily target</Text>
+            </LinearGradient>
+
+            {/* Edit button — re-opens onboarding */}
+            <TouchableOpacity
+              style={profileStyles.editBtn}
+              onPress={() => {
+                setProfileMenuVisible(false);
+                setGoalSet(false);
+              }}
+            >
+              <Text style={profileStyles.editBtnText}>EDIT PROFILE</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       {/* ADD MEAL MODAL */}
       <Modal animationType="slide" transparent={true} visible={modalVisible} onRequestClose={() => setModalVisible(false)}>
         <View style={styles.modalOverlay}>
@@ -1003,166 +1091,65 @@ const ob = StyleSheet.create({
     paddingTop: 60,
     paddingBottom: 40,
   },
-  progressRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 32,
-  },
-  progressDot: {
-    width: 32,
-    height: 4,
-    borderRadius: 2,
-  },
+  progressRow: { flexDirection: 'row', gap: 8, marginBottom: 32 },
+  progressDot: { width: 32, height: 4, borderRadius: 2 },
   progressDotActive: { backgroundColor: '#FF7F50' },
   progressDotInactive: { backgroundColor: 'rgba(255,255,255,0.15)' },
   backBtn: { alignSelf: 'flex-start', marginBottom: 8 },
   backTxt: { color: 'rgba(255,255,255,0.4)', fontSize: 12, fontFamily: 'PressStart2P_400Regular' },
   title: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '900',
-    textAlign: 'center',
-    marginBottom: 16,
-    lineHeight: 32,
-    fontFamily: 'PressStart2P_400Regular',
+    color: '#fff', fontSize: 18, fontWeight: '900', textAlign: 'center',
+    marginBottom: 16, lineHeight: 32, fontFamily: 'PressStart2P_400Regular',
   },
   subtitle: {
-    color: 'rgba(255,255,255,0.5)',
-    fontSize: 11,
-    marginBottom: 32,
-    textAlign: 'center',
-    fontFamily: 'PressStart2P_400Regular',
-    lineHeight: 20,
+    color: 'rgba(255,255,255,0.5)', fontSize: 11, marginBottom: 32,
+    textAlign: 'center', fontFamily: 'PressStart2P_400Regular', lineHeight: 20,
   },
-  optionRow: {
-    flexDirection: 'row',
-    gap: 16,
-    marginBottom: 36,
-    width: '100%',
-  },
+  optionRow: { flexDirection: 'row', gap: 16, marginBottom: 36, width: '100%' },
   bigOption: {
-    flex: 1,
-    aspectRatio: 1,
-    borderRadius: 24,
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.1)',
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
+    flex: 1, aspectRatio: 1, borderRadius: 24, borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.1)', backgroundColor: 'rgba(255,255,255,0.05)',
+    alignItems: 'center', justifyContent: 'center', gap: 8,
   },
-  bigOptionActive: {
-    borderColor: '#FF7F50',
-    backgroundColor: 'rgba(255,127,80,0.15)',
-  },
+  bigOptionActive: { borderColor: '#FF7F50', backgroundColor: 'rgba(255,127,80,0.15)' },
   bigOptionEmoji: { fontSize: 40 },
-  bigOptionLabel: {
-    color: 'rgba(255,255,255,0.5)',
-    fontSize: 11,
-    fontFamily: 'PressStart2P_400Regular',
-  },
+  bigOptionLabel: { color: 'rgba(255,255,255,0.5)', fontSize: 11, fontFamily: 'PressStart2P_400Regular' },
   bigOptionLabelActive: { color: '#FF7F50' },
   inputGroup: { width: '100%', gap: 14, marginBottom: 32 },
   input: {
-    backgroundColor: 'rgba(255,255,255,0.07)',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255,127,80,0.25)',
-    borderRadius: 18,
-    padding: 18,
-    color: '#fff',
-    fontSize: 16,
-    textAlign: 'center',
-    fontFamily: 'PressStart2P_400Regular',
-    width: '100%',
+    backgroundColor: 'rgba(255,255,255,0.07)', borderWidth: 1.5,
+    borderColor: 'rgba(255,127,80,0.25)', borderRadius: 18, padding: 18,
+    color: '#fff', fontSize: 16, textAlign: 'center',
+    fontFamily: 'PressStart2P_400Regular', width: '100%',
   },
   listOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 18,
-    padding: 18,
-    marginBottom: 10,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.08)',
-    width: '100%',
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 18, padding: 18,
+    marginBottom: 10, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.08)', width: '100%',
   },
-  listOptionActive: {
-    borderColor: '#FF7F50',
-    backgroundColor: 'rgba(255,127,80,0.12)',
-  },
-  listLabel: {
-    color: 'rgba(255,255,255,0.75)',
-    fontSize: 11,
-    fontFamily: 'PressStart2P_400Regular',
-    lineHeight: 18,
-  },
+  listOptionActive: { borderColor: '#FF7F50', backgroundColor: 'rgba(255,127,80,0.12)' },
+  listLabel: { color: 'rgba(255,255,255,0.75)', fontSize: 11, fontFamily: 'PressStart2P_400Regular', lineHeight: 18 },
   listLabelActive: { color: '#FF7F50' },
-  listSub: {
-    color: 'rgba(255,255,255,0.35)',
-    fontSize: 9,
-    marginTop: 4,
-    fontFamily: 'PressStart2P_400Regular',
-    lineHeight: 16,
-  },
+  listSub: { color: 'rgba(255,255,255,0.35)', fontSize: 9, marginTop: 4, fontFamily: 'PressStart2P_400Regular', lineHeight: 16 },
   checkmark: { color: '#FF7F50', fontSize: 18, fontWeight: '900' },
   btn: {
-    borderRadius: 22,
-    paddingVertical: 18,
-    paddingHorizontal: 40,
-    alignItems: 'center',
-    width: width - 56,
-    marginTop: 8,
+    borderRadius: 22, paddingVertical: 18, paddingHorizontal: 40,
+    alignItems: 'center', width: width - 56, marginTop: 8,
   },
-  btnText: {
-    color: '#fff',
-    fontWeight: '900',
-    fontSize: 12,
-    letterSpacing: 2,
-    fontFamily: 'PressStart2P_400Regular',
-  },
+  btnText: { color: '#fff', fontWeight: '900', fontSize: 12, letterSpacing: 2, fontFamily: 'PressStart2P_400Regular' },
   resultBadge: {
-    borderRadius: 32,
-    paddingVertical: 28,
-    paddingHorizontal: 48,
-    alignItems: 'center',
-    marginBottom: 28,
-    marginTop: 8,
+    borderRadius: 32, paddingVertical: 28, paddingHorizontal: 48,
+    alignItems: 'center', marginBottom: 28, marginTop: 8,
   },
-  resultNum: {
-    color: '#fff',
-    fontSize: 48,
-    fontWeight: '900',
-    lineHeight: 56,
-    fontFamily: 'PressStart2P_400Regular',
-  },
-  resultUnit: {
-    color: 'rgba(255,255,255,0.7)',
-    fontSize: 11,
-    fontFamily: 'PressStart2P_400Regular',
-    marginTop: 6,
-  },
+  resultNum: { color: '#fff', fontSize: 48, fontWeight: '900', lineHeight: 56, fontFamily: 'PressStart2P_400Regular' },
+  resultUnit: { color: 'rgba(255,255,255,0.7)', fontSize: 11, fontFamily: 'PressStart2P_400Regular', marginTop: 6 },
   summaryBox: {
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderRadius: 20,
-    padding: 18,
-    width: '100%',
-    marginBottom: 24,
-    gap: 10,
+    backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 20, padding: 18,
+    width: '100%', marginBottom: 24, gap: 10,
   },
   summaryRow: { flexDirection: 'row', justifyContent: 'space-between' },
-  summaryLabel: {
-    color: 'rgba(255,255,255,0.4)',
-    fontSize: 9,
-    fontFamily: 'PressStart2P_400Regular',
-    textTransform: 'capitalize',
-  },
-  summaryVal: {
-    color: '#fff',
-    fontSize: 9,
-    fontFamily: 'PressStart2P_400Regular',
-    textTransform: 'capitalize',
-  },
+  summaryLabel: { color: 'rgba(255,255,255,0.4)', fontSize: 9, fontFamily: 'PressStart2P_400Regular', textTransform: 'capitalize' },
+  summaryVal: { color: '#fff', fontSize: 9, fontFamily: 'PressStart2P_400Regular', textTransform: 'capitalize' },
 });
 
 // ─────────────────────────────────────────────
@@ -1171,7 +1158,25 @@ const ob = StyleSheet.create({
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fafafa' },
   scroll: { flex: 1 },
-  header: { paddingTop: 52, paddingBottom: 20, paddingHorizontal: 20, alignItems: 'center' },
+  header: { paddingTop: 10, paddingBottom: 20, paddingHorizontal: 20, alignItems: 'center' },
+
+  // ── Top bar ──
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    marginBottom: 10,
+  },
+  topBarLogo: { width: 280, height: 85, marginLeft: 18 },
+  menuDotsBtn: {
+    position: 'absolute',
+    right: 0,
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.6)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+
   headerLogo: { width: 240, height: 80, marginBottom: 14 },
   catPlaceholderTxt: { color: '#ccc', fontSize: 10 },
   circleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%' },
@@ -1188,50 +1193,30 @@ const styles = StyleSheet.create({
   dateArrowTxt: { fontSize: 22, color: '#ccc' },
   macrosRow: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20, marginVertical: 20 },
   macroBox: {
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    paddingVertical: 15,
-    borderRadius: 20,
-    width: (width - 60) / 3,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
+    alignItems: 'center', backgroundColor: '#fff', paddingVertical: 15,
+    borderRadius: 20, width: (width - 60) / 3,
+    elevation: 2, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 10,
   },
   macroVal: { fontSize: 12, fontWeight: '800', fontFamily: 'PressStart2P_400Regular' },
   macroLabel: { fontSize: 6, color: '#aaa', fontWeight: '700', marginTop: 6, fontFamily: 'PressStart2P_400Regular' },
   bottomNav: {
-    flexDirection: 'row',
-    backgroundColor: '#fff',
-    height: 100,
-    alignItems: 'center',
-    borderTopWidth: 0.5,
-    borderTopColor: '#f0f0f0',
+    flexDirection: 'row', backgroundColor: '#fff', height: 100,
+    alignItems: 'center', borderTopWidth: 0.5, borderTopColor: '#f0f0f0',
   },
   navItem: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   navActive: { color: '#FF7F50', fontSize: 10, fontFamily: 'PressStart2P_400Regular', marginTop: 6 },
   navInactive: { color: '#ccc', fontSize: 10, fontFamily: 'PressStart2P_400Regular', marginTop: 6 },
   plusWrap: { bottom: 0 },
   plusBtn: {
-    width: 58,
-    height: 58,
-    borderRadius: 29,
-    alignItems: 'center',
-    justifyContent: 'center',
-    elevation: 8,
-    shadowColor: '#FF7F50',
-    shadowOpacity: 0.4,
-    shadowRadius: 10,
+    width: 58, height: 58, borderRadius: 29, alignItems: 'center', justifyContent: 'center',
+    elevation: 8, shadowColor: '#FF7F50', shadowOpacity: 0.4, shadowRadius: 10,
   },
   plusTxt: { color: '#fff', fontSize: 32 },
   navIcon: { width: 32, height: 32 },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'flex-end' },
   modalContent: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 35,
-    borderTopRightRadius: 35,
-    padding: 25,
-    paddingBottom: 50,
+    backgroundColor: '#fff', borderTopLeftRadius: 35, borderTopRightRadius: 35,
+    padding: 25, paddingBottom: 50,
   },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 30 },
   modalTitle: { color: '#333', fontSize: 13, fontWeight: '900', letterSpacing: 1, fontFamily: 'PressStart2P_400Regular' },
@@ -1252,22 +1237,14 @@ const styles = StyleSheet.create({
   resultDescription: { color: '#666', fontSize: 11, textAlign: 'center', marginBottom: 20, paddingHorizontal: 10, lineHeight: 20 },
   resultMacros: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 },
   resultMacroItem: {
-    flex: 1,
-    alignItems: 'center',
-    backgroundColor: '#f9f9f9',
-    marginHorizontal: 4,
-    paddingVertical: 14,
-    borderRadius: 16,
+    flex: 1, alignItems: 'center', backgroundColor: '#f9f9f9',
+    marginHorizontal: 4, paddingVertical: 14, borderRadius: 16,
   },
   resultMacroVal: { color: '#333', fontSize: 14, fontWeight: '900', fontFamily: 'PressStart2P_400Regular' },
   resultMacroLabel: { color: '#aaa', fontSize: 8, fontWeight: '700', marginTop: 6, fontFamily: 'PressStart2P_400Regular' },
   healthTipBox: {
-    backgroundColor: 'rgba(255,127,80,0.05)',
-    padding: 16,
-    borderRadius: 18,
-    marginBottom: 25,
-    borderWidth: 1,
-    borderColor: 'rgba(255,127,80,0.1)',
+    backgroundColor: 'rgba(255,127,80,0.05)', padding: 16, borderRadius: 18,
+    marginBottom: 25, borderWidth: 1, borderColor: 'rgba(255,127,80,0.1)',
   },
   healthTipTitle: { color: '#FF7F50', fontSize: 9, fontWeight: '900', letterSpacing: 1, marginBottom: 6, fontFamily: 'PressStart2P_400Regular' },
   healthTipText: { color: '#666', fontSize: 9, lineHeight: 18, fontFamily: 'PressStart2P_400Regular' },
@@ -1278,39 +1255,19 @@ const styles = StyleSheet.create({
   galleryBtnText: { color: '#ccc', fontSize: 11, fontFamily: 'PressStart2P_400Regular' },
   searchSub: { color: '#666', fontSize: 11, marginBottom: 15, fontFamily: 'PressStart2P_400Regular', lineHeight: 20 },
   searchBox: {
-    backgroundColor: '#f5f5f5',
-    borderRadius: 15,
-    padding: 18,
-    fontSize: 10,
-    color: '#333',
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: '#eee',
-    fontFamily: 'PressStart2P_400Regular',
+    backgroundColor: '#f5f5f5', borderRadius: 15, padding: 18, fontSize: 10, color: '#333',
+    marginBottom: 20, borderWidth: 1, borderColor: '#eee', fontFamily: 'PressStart2P_400Regular',
   },
   manualForm: { marginBottom: 20 },
   manualInput: {
-    backgroundColor: '#f5f5f5',
-    borderRadius: 12,
-    padding: 15,
-    fontSize: 9,
-    color: '#333',
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#eee',
-    fontFamily: 'PressStart2P_400Regular',
+    backgroundColor: '#f5f5f5', borderRadius: 12, padding: 15, fontSize: 9, color: '#333',
+    marginBottom: 12, borderWidth: 1, borderColor: '#eee', fontFamily: 'PressStart2P_400Regular',
   },
   macroInputRow: { flexDirection: 'row', justifyContent: 'space-between' },
   mealList: { padding: 16 },
   mealSection: {
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    padding: 16,
-    marginBottom: 12,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
+    backgroundColor: '#fff', borderRadius: 20, padding: 16, marginBottom: 12,
+    elevation: 2, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 10,
   },
   mealHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   mealTitleRow: { flexDirection: 'row', alignItems: 'center' },
@@ -1320,12 +1277,8 @@ const styles = StyleSheet.create({
   mealPlus: { width: 32, height: 32, borderRadius: 16, borderWidth: 1, borderColor: '#eee', alignItems: 'center', justifyContent: 'center' },
   mealPlusTxt: { fontSize: 18, color: '#FF7F50', fontWeight: '300' },
   loggedMeal: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#f9f9f9',
+    flexDirection: 'row', justifyContent: 'space-between', marginTop: 12,
+    paddingTop: 12, borderTopWidth: 1, borderTopColor: '#f9f9f9',
   },
   loggedMealName: { fontSize: 11, color: '#666', fontFamily: 'PressStart2P_400Regular', lineHeight: 18 },
   loggedMealCal: { fontSize: 11, color: '#333', fontFamily: 'PressStart2P_400Regular' },
@@ -1334,6 +1287,28 @@ const styles = StyleSheet.create({
   typeBtnText: { fontWeight: '900', color: '#FF7F50', letterSpacing: 1, fontSize: 10, fontFamily: 'PressStart2P_400Regular' },
   cancelBtn: { marginTop: 20, paddingVertical: 15, alignItems: 'center' },
   cancelBtnText: { color: '#aaa', fontWeight: '800', fontSize: 10, fontFamily: 'PressStart2P_400Regular' },
+});
+
+// ─────────────────────────────────────────────
+// PROFILE MODAL STYLES
+// ─────────────────────────────────────────────
+const profileStyles = StyleSheet.create({
+  avatarWrap: { alignItems: 'center', marginBottom: 24 },
+  avatar: { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center' },
+  avatarEmoji: { fontSize: 32, color: '#fff' },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 20 },
+  gridCell: {
+    flexBasis: '30%', flex: 1, backgroundColor: '#f9f9f9', borderRadius: 16,
+    paddingVertical: 14, paddingHorizontal: 10, alignItems: 'center',
+    minWidth: (width - 90) / 3,
+  },
+  gridVal: { fontSize: 9, fontWeight: '900', color: '#333', fontFamily: 'PressStart2P_400Regular', textAlign: 'center', lineHeight: 16 },
+  gridLabel: { fontSize: 7, color: '#aaa', fontFamily: 'PressStart2P_400Regular', marginTop: 6, textAlign: 'center' },
+  calorieBadge: { borderRadius: 20, paddingVertical: 18, alignItems: 'center', marginBottom: 20 },
+  calorieNum: { fontSize: 28, fontWeight: '900', color: '#fff', fontFamily: 'PressStart2P_400Regular' },
+  calorieUnit: { fontSize: 8, color: 'rgba(255,255,255,0.8)', fontFamily: 'PressStart2P_400Regular', marginTop: 6 },
+  editBtn: { paddingVertical: 16, alignItems: 'center', borderWidth: 1.5, borderColor: '#FF7F50', borderRadius: 18 },
+  editBtnText: { color: '#FF7F50', fontSize: 10, fontFamily: 'PressStart2P_400Regular', letterSpacing: 1 },
 });
 
 // ─────────────────────────────────────────────
@@ -1348,16 +1323,14 @@ const goalsStyles = StyleSheet.create({
   inputGroup: { marginBottom: 24 },
   label: { fontSize: 7, color: '#FF6B6B', marginBottom: 12, fontFamily: 'PressStart2P_400Regular' },
   input: {
-    backgroundColor: 'rgba(255,107,107,0.08)',
-    borderRadius: 14,
-    padding: 16,
-    fontSize: 9,
-    color: '#CC3D3D',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255,107,107,0.25)',
+    backgroundColor: 'rgba(255,107,107,0.08)', borderRadius: 14, padding: 16,
+    fontSize: 9, color: '#CC3D3D', borderWidth: 1.5, borderColor: 'rgba(255,107,107,0.25)',
     fontFamily: 'PressStart2P_400Regular',
   },
-  saveBtn: { backgroundColor: '#FF6B6B', padding: 20, alignItems: 'center', borderRadius: 18, shadowColor: '#FF6B6B', shadowOpacity: 0.4, shadowRadius: 14, shadowOffset: { width: 0, height: 6 } },
+  saveBtn: {
+    backgroundColor: '#FF6B6B', padding: 20, alignItems: 'center', borderRadius: 18,
+    shadowColor: '#FF6B6B', shadowOpacity: 0.4, shadowRadius: 14, shadowOffset: { width: 0, height: 6 },
+  },
   saveBtnText: { color: '#fff', fontSize: 10, fontFamily: 'PressStart2P_400Regular' },
   activeGoalBox: { flex: 1, padding: 20 },
   activeLabel: { fontSize: 8, color: '#FF8C69', marginBottom: 20, textAlign: 'center', fontFamily: 'PressStart2P_400Regular' },
@@ -1369,4 +1342,4 @@ const goalsStyles = StyleSheet.create({
   deadlineVal: { fontSize: 10, color: '#CC3D3D', fontFamily: 'PressStart2P_400Regular' },
   clearBtn: { marginTop: 40, padding: 15, alignItems: 'center' },
   clearBtnText: { color: '#FF8C69', fontSize: 8, fontFamily: 'PressStart2P_400Regular' },
-}); 
+});

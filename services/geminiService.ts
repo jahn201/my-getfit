@@ -21,22 +21,27 @@ function getRandomDemoMeal(): ScanResult {
   return DEMO_MEALS[Math.floor(Math.random() * DEMO_MEALS.length)];
 }
 
-function extractText(parts: any[]): string {
-  if (!Array.isArray(parts) || !parts.length) return '';
-  // Safely find the first part that has text
-  const answer = parts.find((p: any) => p && typeof p.text === 'string' && !p.thought);
-  return answer?.text ?? parts[parts.length - 1]?.text ?? '';
+const API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent';
+
+function buildConfig() {
+  return {
+    generationConfig: {
+      temperature: 0.7,
+    },
+  };
 }
 
 function parseResult(raw: string): ScanResult {
   if (!raw) throw new Error('AI returned an empty response.');
+  
+  // Clean up markdown code blocks if they exist
   const clean = raw.replace(/```json|```/gi, '').trim();
   const match = clean.match(/\{[\s\S]*\}/);
+  
   if (!match) throw new Error('No valid nutritional data found in AI response.');
   
   try {
     const p = JSON.parse(match[0]);
-    
     const toNum = (val: any) => {
       if (typeof val === 'number') return val;
       if (typeof val === 'string') return parseInt(val.replace(/[^0-9]/g, ''), 10) || 0;
@@ -53,106 +58,104 @@ function parseResult(raw: string): ScanResult {
       healthTip: String(p.healthTip ?? ''),
     };
   } catch (err) {
-    throw new Error('Failed to parse nutrition data. Please try again.');
+    console.error('[gemini] Parse error:', err, 'Raw:', raw);
+    throw new Error('Failed to interpret nutrition data.');
   }
 }
 
-const API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent';
-
-function buildConfig() {
-  return {
-    generationConfig: {
-      temperature: 1,
-      thinkingConfig: { thinkingBudget: 0 },
-    },
-  };
+async function fetchWithRetry(url: string, options: any, retries = 2): Promise<Response> {
+  try {
+    const res = await fetch(url, options);
+    if ((res.status === 503 || res.status === 429) && retries > 0) {
+      await new Promise(r => setTimeout(r, 1500));
+      return fetchWithRetry(url, options, retries - 1);
+    }
+    return res;
+  } catch (e) {
+    if (retries > 0) return fetchWithRetry(url, options, retries - 1);
+    throw e;
+  }
 }
 
 export async function analyzeFoodImage(base64Image: string): Promise<ScanResult> {
-  if (!base64Image || base64Image.length < 100) {
-    throw new Error('Image data is missing or too small.');
-  }
+  if (!base64Image || base64Image.length < 100) throw new Error('Invalid image data.');
 
   const key = process.env.EXPO_PUBLIC_GEMINI_API_KEY ?? '';
   if (!key) { console.warn('[gemini] No key, using demo'); return getRandomDemoMeal(); }
 
-  console.log('[gemini] Image scan start, base64 length:', base64Image.length);
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30000);
 
-  let res: Response;
   try {
-    res = await fetch(`${API_BASE}?key=${key}`, {
+    const res = await fetchWithRetry(`${API_BASE}?key=${key}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: [{
           parts: [
-            { text: 'Identify this food. Return ONLY JSON, no markdown, no extra text: {"food":"name","calories":number,"protein":"Xg","carbs":"Xg","fats":"Xg","description":"brief","healthTip":"brief"}' },
+            { text: 'Identify the food in this image. Return ONLY JSON: {"food":"name","calories":number,"protein":"Xg","carbs":"Xg","fats":"Xg","description":"brief","healthTip":"brief"}' },
             { inline_data: { mime_type: 'image/jpeg', data: base64Image } },
           ],
         }],
         ...buildConfig(),
       }),
+      signal: controller.signal,
     });
+
+    if (!res.ok) {
+      const txt = await res.text().catch(() => '');
+      console.error('[gemini] API Error:', res.status, txt);
+      let msg = `API error ${res.status}`;
+      try { msg = JSON.parse(txt)?.error?.message ?? msg; } catch { }
+      if (/quota|rate|demand|overloaded/i.test(msg)) return getRandomDemoMeal();
+      throw new Error(msg);
+    }
+
+    const data = await res.json();
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!text) throw new Error('AI could not identify this image.');
+    return parseResult(text);
   } catch (e: any) {
-    throw new Error('Network error: ' + e.message);
+    if (e.name === 'AbortError') throw new Error('Request timed out. Try a better connection.');
+    throw e;
+  } finally {
+    clearTimeout(timeoutId);
   }
-
-  console.log('[gemini] status:', res.status);
-
-  if (!res.ok) {
-    const txt = await res.text().catch(() => '');
-    console.error('[gemini] error body:', txt.slice(0, 300));
-    let msg = `API error ${res.status}`;
-    try { msg = JSON.parse(txt)?.error?.message ?? msg; } catch { }
-    if (/quota|rate|api key/i.test(msg)) return getRandomDemoMeal();
-    throw new Error(msg);
-  }
-
-  const data = await res.json();
-  console.log('[gemini] response:', JSON.stringify(data).slice(0, 400));
-
-  const parts = data?.candidates?.[0]?.content?.parts ?? [];
-  const text = extractText(parts);
-  console.log('[gemini] extracted text:', text.slice(0, 200));
-
-  if (!text) throw new Error('AI returned empty response. Try a clearer photo.');
-  return parseResult(text);
 }
 
 export async function searchFoodNutrition(query: string): Promise<ScanResult> {
-  if (!query?.trim() || query.trim().length < 2) throw new Error('Please enter a food name.');
+  if (!query?.trim()) throw new Error('Enter a food name.');
 
   const key = process.env.EXPO_PUBLIC_GEMINI_API_KEY ?? '';
-  if (!key) { console.warn('[gemini] No key, using demo'); return getRandomDemoMeal(); }
+  if (!key) {
+    console.warn('[gemini] No API key found for search, using demo');
+    return getRandomDemoMeal();
+  }
 
-  let res: Response;
   try {
-    res = await fetch(`${API_BASE}?key=${key}`, {
+    const res = await fetchWithRetry(`${API_BASE}?key=${key}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: [{
-          parts: [{ text: `Nutrition for: "${query}". Return ONLY JSON, no markdown: {"food":"name","calories":number,"protein":"Xg","carbs":"Xg","fats":"Xg","description":"brief","healthTip":"brief"}` }],
+          parts: [{ text: `Nutritional facts for: "${query}". Return ONLY JSON: {"food":"name","calories":number,"protein":"Xg","carbs":"Xg","fats":"Xg","description":"brief","healthTip":"brief"}` }],
         }],
         ...buildConfig(),
       }),
     });
+
+    if (!res.ok) {
+      const txt = await res.text().catch(() => '');
+      console.error('[gemini] Search API error:', res.status, txt);
+      return getRandomDemoMeal();
+    }
+
+    const data = await res.json();
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!text) throw new Error('No data found for this food.');
+    return parseResult(text);
   } catch (e: any) {
-    throw new Error('Network error: ' + e.message);
+    console.error('[gemini] Search error:', e.message);
+    throw new Error('Search failed: ' + e.message);
   }
-
-  if (!res.ok) {
-    const txt = await res.text().catch(() => '');
-    let msg = `API error ${res.status}`;
-    try { msg = JSON.parse(txt)?.error?.message ?? msg; } catch { }
-    if (/quota|api key/i.test(msg)) return getRandomDemoMeal();
-    throw new Error(msg);
-  }
-
-  const data = await res.json();
-  const parts = data?.candidates?.[0]?.content?.parts ?? [];
-  const text = extractText(parts);
-
-  if (!text) throw new Error('AI returned empty response.');
-  return parseResult(text);
 }

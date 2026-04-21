@@ -81,9 +81,7 @@ export default function RegisterScreen() {
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
 
           <Animated.View style={[styles.header, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
-            <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-              <Text style={styles.backText}>← Back</Text>
-            </TouchableOpacity>
+
             <Text style={styles.title}>Create Account</Text>
             <Text style={styles.subtitle}>Ready for your Kittness journey?</Text>
           </Animated.View>
@@ -196,8 +194,7 @@ const styles = StyleSheet.create({
 
   scroll: { flexGrow: 1, paddingHorizontal: 24, paddingBottom: 60, width: width },
   header: { paddingTop: 60, marginBottom: 28 },
-  backBtn: { marginBottom: 24 },
-  backText: { color: '#FF6B6B', fontSize: 9, fontFamily: 'PressStart2P_400Regular' },
+
   title: { fontSize: 18, color: '#CC3D3D', lineHeight: 28, fontFamily: 'PressStart2P_400Regular' },
   subtitle: { color: '#FF8C69', fontSize: 9, marginTop: 14, fontFamily: 'PressStart2P_400Regular', lineHeight: 16 },
 

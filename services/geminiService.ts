@@ -22,12 +22,14 @@ function getRandomDemoMeal(): ScanResult {
 }
 
 function extractText(parts: any[]): string {
-  if (!parts?.length) return '';
-  const answer = parts.find((p: any) => p.text && !p.thought);
+  if (!Array.isArray(parts) || !parts.length) return '';
+  // Safely find the first part that has text
+  const answer = parts.find((p: any) => p && typeof p.text === 'string' && !p.thought);
   return answer?.text ?? parts[parts.length - 1]?.text ?? '';
 }
 
 function parseResult(raw: string): ScanResult {
+  if (!raw) throw new Error('AI returned an empty response.');
   const clean = raw.replace(/```json|```/gi, '').trim();
   const match = clean.match(/\{[\s\S]*\}/);
   if (!match) throw new Error('No valid nutritional data found in AI response.');

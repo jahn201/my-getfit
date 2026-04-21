@@ -12,6 +12,7 @@ import { analyzeFoodImage, searchFoodNutrition, type ScanResult } from '../servi
 import { useFonts, PressStart2P_400Regular } from '@expo-google-fonts/press-start-2p';
 
 const { width } = Dimensions.get('window');
+// Add this near your other state declarations (top of HomeScreen)
 
 // ─────────────────────────────────────────────
 // CAT IMAGES
@@ -347,6 +348,7 @@ export default function HomeScreen() {
   const [goalSet, setGoalSet] = useState(false);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [calorieGoal, setCalorieGoal] = useState(2200);
+  const pendingMealRef = React.useRef<ScanResult | null>(null);
   const [caloriesConsumed, setCaloriesConsumed] = useState(0);
   const [proteinConsumed, setProteinConsumed] = useState(0);
   const [carbsConsumed, setCarbsConsumed] = useState(0);
@@ -478,28 +480,50 @@ export default function HomeScreen() {
 
   const logMeal = () => {
     if (!scanResult || scanResult.calories <= 0) return;
-    // Snapshot scanResult NOW before any state changes wipe it
     const mealToLog = { ...scanResult };
+    pendingMealRef.current = mealToLog;
+
     if (selectedMealType) {
       confirmLogMeal(selectedMealType, mealToLog);
       setSelectedMealType(null);
     } else {
-      setMealTypeModalVisible(true);
+      setScannerVisible(false); // ← close scanner FIRST
+      setTimeout(() => {
+        setMealTypeModalVisible(true); // ← then open meal type picker
+      }, 300); // small delay lets the first modal finish closing
     }
   };
 
   const confirmLogMeal = (type: MealType, mealSnapshot?: ScanResult) => {
-    // Use passed snapshot OR current scanResult — never stale closure
-    const meal = mealSnapshot ?? scanResult;
-    if (!meal) return;
-    setMeals(prev => ({ ...prev, [type]: [...prev[type], meal] }));
-    setCaloriesConsumed(prev => prev + meal.calories);
-    const parseG = (str: string | number) => parseInt(str.toString().replace('g', ''), 10) || 0;
-    setProteinConsumed(prev => prev + parseG(meal.protein));
-    setCarbsConsumed(prev => prev + parseG(meal.carbs));
-    setFatsConsumed(prev => prev + parseG(meal.fats));
+    const meal = mealSnapshot ?? pendingMealRef.current ?? scanResult;
+    if (!meal) {
+      Alert.alert('Error', 'No meal data found to log.');
+      return;
+    }
+
+    const kcal = Number(meal.calories) || 0;
+    const parseG = (str: string | number) => {
+      if (typeof str === 'number') return str;
+      return parseInt(str.toString().replace(/[^0-9]/g, ''), 10) || 0;
+    };
+
+    const p = parseG(meal.protein);
+    const c = parseG(meal.carbs);
+    const f = parseG(meal.fats);
+
+    setMeals(prev => ({ ...prev, [type]: [...prev[type], { ...meal, calories: kcal }] }));
+    setCaloriesConsumed(prev => prev + kcal);
+    setProteinConsumed(prev => prev + p);
+    setCarbsConsumed(prev => prev + c);
+    setFatsConsumed(prev => prev + f);
+
+    pendingMealRef.current = null;
     setMealTypeModalVisible(false);
-    resetScanner();
+    setScannerVisible(false);      // ← close scanner directly
+    setCapturedImage(null);        // ← clear image directly  
+    setScanResult(null);           // ← clear result directly
+    setScanning(false);            // ← reset scanning directly
+
     Alert.alert('✓ Logged!', `${meal.food} added to ${type}`);
   };
 
@@ -526,7 +550,7 @@ export default function HomeScreen() {
       Alert.alert('Invalid Entry', 'Please enter a name and calorie amount.');
       return;
     }
-    setScanResult({
+    const newMeal: ScanResult = {
       food: manualName,
       calories: kcal,
       protein: manualProtein || '0g',
@@ -534,14 +558,20 @@ export default function HomeScreen() {
       fats: manualFats || '0g',
       description: 'Manually entered',
       healthTip: 'Manual entry logged.'
-    });
+    };
+    setScanResult(newMeal);
+    pendingMealRef.current = newMeal; // ← ADD THIS
     setManualModalVisible(false);
     setManualName('');
     setManualKcal('');
     setManualProtein('');
     setManualCarbs('');
     setManualFats('');
-    setMealTypeModalVisible(true);
+    if (selectedMealType) {
+      confirmLogMeal(selectedMealType, newMeal);
+    } else {
+      setMealTypeModalVisible(true);
+    }
   };
 
   const resetScanner = () => {
@@ -946,7 +976,7 @@ export default function HomeScreen() {
             <Text style={styles.modalTitle}>SELECT MEAL TYPE</Text>
             <View style={styles.typeGrid}>
               {(['Breakfast', 'Lunch', 'Dinner', 'Snacks'] as MealType[]).map(t => (
-                <TouchableOpacity key={t} style={styles.typeBtn} onPress={() => confirmLogMeal(t, scanResult ?? undefined)}>
+                <TouchableOpacity key={t} style={styles.typeBtn} onPress={() => confirmLogMeal(t, pendingMealRef.current ?? scanResult ?? undefined)}>
                   <Text style={styles.typeBtnText}>{t.toUpperCase()}</Text>
                 </TouchableOpacity>
               ))}

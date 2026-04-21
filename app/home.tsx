@@ -409,9 +409,30 @@ export default function HomeScreen() {
       const result = await analyzeFoodImage(base64Image);
       setScanResult(result);
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Could not analyze image.');
+      resetScanner();
+      Alert.alert('Scan Failed', err.message || 'Could not analyze image. Please try again.');
     } finally {
       setScanning(false);
+    }
+  };
+
+  // Retake from INSIDE the scanner modal — keep modal open, just re-scan
+  const retakePhoto = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission needed', 'Camera access is required.');
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      base64: true,
+      quality: 0.6,
+      mediaTypes: ['images'] as any,
+    });
+    if (!result.canceled && result.assets[0].base64) {
+      const base64 = result.assets[0].base64;
+      setCapturedImage(result.assets[0].uri);
+      // scanner modal is already open — just re-analyze, no state flicker
+      analyzeImageWithAI(base64);
     }
   };
 
@@ -423,14 +444,15 @@ export default function HomeScreen() {
     }
     const result = await ImagePicker.launchCameraAsync({
       base64: true,
-      quality: 0.7,
-      mediaTypes: ImagePicker.MediaType.Images,
+      quality: 0.6,
+      mediaTypes: ['images'] as any,
     });
     if (!result.canceled && result.assets[0].base64) {
+      const base64 = result.assets[0].base64;
       setCapturedImage(result.assets[0].uri);
       setModalVisible(false);
       setScannerVisible(true);
-      await analyzeImageWithAI(result.assets[0].base64);
+      analyzeImageWithAI(base64); // no await — modal already visible
     }
   };
 
@@ -442,39 +464,43 @@ export default function HomeScreen() {
     }
     const result = await ImagePicker.launchImageLibraryAsync({
       base64: true,
-      quality: 0.7,
-      mediaTypes: ImagePicker.MediaType.Images,
+      quality: 0.6,
+      mediaTypes: ['images'] as any,
     });
     if (!result.canceled && result.assets[0].base64) {
+      const base64 = result.assets[0].base64;
       setCapturedImage(result.assets[0].uri);
       setModalVisible(false);
       setScannerVisible(true);
-      await analyzeImageWithAI(result.assets[0].base64);
+      analyzeImageWithAI(base64); // no await — modal already visible
     }
   };
 
   const logMeal = () => {
-    if (scanResult && scanResult.calories > 0) {
-      if (selectedMealType) {
-        confirmLogMeal(selectedMealType);
-        setSelectedMealType(null);
-      } else {
-        setMealTypeModalVisible(true);
-      }
+    if (!scanResult || scanResult.calories <= 0) return;
+    // Snapshot scanResult NOW before any state changes wipe it
+    const mealToLog = { ...scanResult };
+    if (selectedMealType) {
+      confirmLogMeal(selectedMealType, mealToLog);
+      setSelectedMealType(null);
+    } else {
+      setMealTypeModalVisible(true);
     }
   };
 
-  const confirmLogMeal = (type: MealType) => {
-    if (!scanResult) return;
-    setMeals(prev => ({ ...prev, [type]: [...prev[type], scanResult] }));
-    setCaloriesConsumed(prev => prev + scanResult.calories);
+  const confirmLogMeal = (type: MealType, mealSnapshot?: ScanResult) => {
+    // Use passed snapshot OR current scanResult — never stale closure
+    const meal = mealSnapshot ?? scanResult;
+    if (!meal) return;
+    setMeals(prev => ({ ...prev, [type]: [...prev[type], meal] }));
+    setCaloriesConsumed(prev => prev + meal.calories);
     const parseG = (str: string | number) => parseInt(str.toString().replace('g', ''), 10) || 0;
-    setProteinConsumed(prev => prev + parseG(scanResult.protein));
-    setCarbsConsumed(prev => prev + parseG(scanResult.carbs));
-    setFatsConsumed(prev => prev + parseG(scanResult.fats));
+    setProteinConsumed(prev => prev + parseG(meal.protein));
+    setCarbsConsumed(prev => prev + parseG(meal.carbs));
+    setFatsConsumed(prev => prev + parseG(meal.fats));
     setMealTypeModalVisible(false);
     resetScanner();
-    Alert.alert('Logged', `${scanResult.food} added to ${type}`);
+    Alert.alert('✓ Logged!', `${meal.food} added to ${type}`);
   };
 
   const handleAISearch = async () => {
@@ -839,7 +865,7 @@ export default function HomeScreen() {
                   <Text style={styles.healthTipText}>{scanResult.healthTip}</Text>
                 </View>
                 <View style={styles.resultActions}>
-                  <TouchableOpacity style={styles.retryBtn} onPress={openCamera}>
+                  <TouchableOpacity style={styles.retryBtn} onPress={retakePhoto}>
                     <Text style={styles.retryBtnText}>Retake</Text>
                   </TouchableOpacity>
                   <TouchableOpacity style={{ flex: 1 }} onPress={logMeal}>
@@ -920,7 +946,7 @@ export default function HomeScreen() {
             <Text style={styles.modalTitle}>SELECT MEAL TYPE</Text>
             <View style={styles.typeGrid}>
               {(['Breakfast', 'Lunch', 'Dinner', 'Snacks'] as MealType[]).map(t => (
-                <TouchableOpacity key={t} style={styles.typeBtn} onPress={() => confirmLogMeal(t)}>
+                <TouchableOpacity key={t} style={styles.typeBtn} onPress={() => confirmLogMeal(t, scanResult ?? undefined)}>
                   <Text style={styles.typeBtnText}>{t.toUpperCase()}</Text>
                 </TouchableOpacity>
               ))}
@@ -1313,5 +1339,4 @@ const goalsStyles = StyleSheet.create({
   deadlineVal: { fontSize: 10, color: '#CC3D3D', fontFamily: 'PressStart2P_400Regular' },
   clearBtn: { marginTop: 40, padding: 15, alignItems: 'center' },
   clearBtnText: { color: '#FF8C69', fontSize: 8, fontFamily: 'PressStart2P_400Regular' },
-});
-
+}); 

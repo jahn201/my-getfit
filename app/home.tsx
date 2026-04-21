@@ -424,7 +424,7 @@ export default function HomeScreen() {
     const result = await ImagePicker.launchCameraAsync({
       base64: true,
       quality: 0.7,
-      mediaTypes: ImagePicker.MediaType.Images,
+      mediaTypes: ['images'],
     });
     if (!result.canceled && result.assets[0].base64) {
       setCapturedImage(result.assets[0].uri);
@@ -443,7 +443,7 @@ export default function HomeScreen() {
     const result = await ImagePicker.launchImageLibraryAsync({
       base64: true,
       quality: 0.7,
-      mediaTypes: ImagePicker.MediaType.Images,
+      mediaTypes: ['images'],
     });
     if (!result.canceled && result.assets[0].base64) {
       setCapturedImage(result.assets[0].uri);

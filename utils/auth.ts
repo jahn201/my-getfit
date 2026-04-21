@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const USERS_KEY = 'my_getfit_users_v1';
+const LAST_LOGIN_KEY = 'my_getfit_last_login';
 
 export interface StoredUser {
   name: string;
@@ -60,4 +61,26 @@ export async function loginUser(email: string, password: string): Promise<{ user
 
   if (!match) return { error: 'Invalid email or password.' };
   return { user: match };
+}
+
+/** Save the last used credentials for auto-fill */
+export async function setLastLogin(email: string, password?: string): Promise<void> {
+  try {
+    await AsyncStorage.setItem(LAST_LOGIN_KEY, JSON.stringify({ email, password: password || '' }));
+  } catch (err) {
+    console.warn('Failed to save last login:', err);
+  }
+}
+
+/** Retrieve the last used credentials */
+export async function getLastLogin(): Promise<{ email: string; password?: string } | null> {
+  try {
+    const json = await AsyncStorage.getItem(LAST_LOGIN_KEY);
+    if (json) {
+      return JSON.parse(json);
+    }
+  } catch (err) {
+    console.warn('Failed to get last login:', err);
+  }
+  return null;
 }

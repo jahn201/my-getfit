@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TextInput, TouchableOpacity, Animated, Dimensio
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useFonts, PressStart2P_400Regular } from '@expo-google-fonts/press-start-2p';
-import { loginUser } from '../utils/auth';
+import { loginUser, getLastLogin, setLastLogin } from '../utils/auth';
 
 const { width } = Dimensions.get('window');
 
@@ -19,9 +19,6 @@ export default function LoginScreen() {
   const [formError, setFormError] = useState('');
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(40)).current;
-  const wave1Anim = useRef(new Animated.Value(0)).current;
-  const wave2Anim = useRef(new Animated.Value(0)).current;
-  const wave3Anim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.parallel([
@@ -29,17 +26,15 @@ export default function LoginScreen() {
       Animated.spring(slideAnim, { toValue: 0, friction: 8, useNativeDriver: true }),
     ]).start();
 
-    const waveLoop = (anim: Animated.Value, delay: number) =>
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(anim, { toValue: 1, duration: 3000, delay, useNativeDriver: true }),
-          Animated.timing(anim, { toValue: 0, duration: 3000, useNativeDriver: true }),
-        ])
-      ).start();
-
-    waveLoop(wave1Anim, 0);
-    waveLoop(wave2Anim, 600);
-    waveLoop(wave3Anim, 1200);
+    // Auto-fill last used credentials
+    const loadLastLogin = async () => {
+      const creds = await getLastLogin();
+      if (creds) {
+        if (creds.email) setEmail(creds.email);
+        if (creds.password) setPassword(creds.password);
+      }
+    };
+    loadLastLogin();
   }, []);
 
   if (!fontsLoaded) {
@@ -61,22 +56,16 @@ export default function LoginScreen() {
       return;
     }
 
+    // Save successful login credentials
+    await setLastLogin(email, password);
+
     // Success - navigate to home
     router.push('/home');
   };
 
-  const wave1Y = wave1Anim.interpolate({ inputRange: [0, 1], outputRange: [0, -18] });
-  const wave2Y = wave2Anim.interpolate({ inputRange: [0, 1], outputRange: [0, -14] });
-  const wave3Y = wave3Anim.interpolate({ inputRange: [0, 1], outputRange: [0, -10] });
-
   return (
     <View style={styles.container}>
       <View style={styles.bg} />
-
-      {/* Coral pink waves */}
-      <Animated.View style={[styles.wave, styles.wave3, { transform: [{ translateY: wave3Y }] }]} />
-      <Animated.View style={[styles.wave, styles.wave2, { transform: [{ translateY: wave2Y }] }]} />
-      <Animated.View style={[styles.wave, styles.wave1, { transform: [{ translateY: wave1Y }] }]} />
 
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1, width: '100%' }}>
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
@@ -85,8 +74,8 @@ export default function LoginScreen() {
             <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
               <Text style={styles.backText}>← Back</Text>
             </TouchableOpacity>
-            <Text style={styles.title}>Welcome{'\n'}Back</Text>
-            <Text style={styles.subtitle}>Sign in to continue your fitness journey</Text>
+            <Text style={styles.title}>Welcome Back</Text>
+            <Text style={styles.subtitle}>Sign in to continue your Kittness journey</Text>
           </Animated.View>
 
           <Animated.View style={[styles.form, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
@@ -118,10 +107,10 @@ export default function LoginScreen() {
                   secureTextEntry={!showPassword}
                 />
                 <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeBtn}>
-                  <Ionicons 
-                    name={showPassword ? 'eye-off-outline' : 'eye-outline'} 
-                    size={22} 
-                    color="#FF6B6B" 
+                  <Ionicons
+                    name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                    size={22}
+                    color="#FF6B6B"
                   />
                 </TouchableOpacity>
               </View>
@@ -170,16 +159,11 @@ const styles = StyleSheet.create({
   container: { flex: 1, alignItems: 'center', overflow: 'hidden' },
   bg: { ...StyleSheet.absoluteFillObject, backgroundColor: '#FFF0EC' },
 
-  wave: { position: 'absolute', width: width * 2, borderRadius: 999 },
-  wave1: { height: 380, bottom: -180, left: -width * 0.5, backgroundColor: '#FF6B6B', opacity: 0.35 },
-  wave2: { height: 340, bottom: -200, left: -width * 0.3, backgroundColor: '#FF8C69', opacity: 0.30 },
-  wave3: { height: 300, bottom: -220, left: -width * 0.1, backgroundColor: '#FFB347', opacity: 0.20 },
-
   scroll: { flexGrow: 1, paddingHorizontal: 24, paddingBottom: 60, width: width },
   header: { paddingTop: 60, marginBottom: 32 },
   backBtn: { marginBottom: 24 },
   backText: { color: '#FF6B6B', fontSize: 9, fontFamily: 'PressStart2P_400Regular' },
-  title: { fontSize: 24, color: '#CC3D3D', lineHeight: 32, fontFamily: 'PressStart2P_400Regular' },
+  title: { fontSize: 18, color: '#CC3D3D', lineHeight: 28, fontFamily: 'PressStart2P_400Regular' },
   subtitle: { color: '#FF8C69', fontSize: 9, marginTop: 14, fontFamily: 'PressStart2P_400Regular', lineHeight: 16 },
 
   form: { flex: 1 },

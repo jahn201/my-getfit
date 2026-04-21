@@ -182,7 +182,7 @@ export async function searchFoodNutrition(query: string): Promise<ScanResult> {
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
     const message: string = errorData?.error?.message ?? `API error ${response.status}`;
-    
+
     // Fallback to demo for quota issues
     if (message.toLowerCase().includes('quota') || message.toLowerCase().includes('api key')) {
       return getRandomDemoMeal();

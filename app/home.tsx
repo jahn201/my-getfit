@@ -446,15 +446,21 @@ export default function HomeScreen() {
     }
     const result = await ImagePicker.launchCameraAsync({
       base64: true,
-      quality: 0.6,
+      quality: 0.5, // Slightly lower quality to reduce memory load
       mediaTypes: ['images'] as any,
     });
     if (!result.canceled && result.assets[0].base64) {
       const base64 = result.assets[0].base64;
-      setCapturedImage(result.assets[0].uri);
+      const uri = result.assets[0].uri;
+      
       setModalVisible(false);
-      setScannerVisible(true);
-      analyzeImageWithAI(base64);
+      
+      // Delay opening scanner modal to allow Add Meal modal to close fully
+      setTimeout(() => {
+        setCapturedImage(uri);
+        setScannerVisible(true);
+        analyzeImageWithAI(base64);
+      }, 600);
     }
   };
 
@@ -466,15 +472,20 @@ export default function HomeScreen() {
     }
     const result = await ImagePicker.launchImageLibraryAsync({
       base64: true,
-      quality: 0.6,
+      quality: 0.5,
       mediaTypes: ['images'] as any,
     });
     if (!result.canceled && result.assets[0].base64) {
       const base64 = result.assets[0].base64;
-      setCapturedImage(result.assets[0].uri);
+      const uri = result.assets[0].uri;
+
       setModalVisible(false);
-      setScannerVisible(true);
-      analyzeImageWithAI(base64);
+
+      setTimeout(() => {
+        setCapturedImage(uri);
+        setScannerVisible(true);
+        analyzeImageWithAI(base64);
+      }, 600);
     }
   };
 
